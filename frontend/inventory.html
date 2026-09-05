@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,415 +13,735 @@
 
 <body>
 
-    <!-- Shared Sidebar -->
-    <div id="sharedSidebar"></div>
+    <!-- =========================================================
+         APPLICATION SHELL
+         ========================================================= -->
 
-    <!-- Main Content -->
-    <main class="main-content">
+    <div class="app-shell">
 
-        <!-- Top Bar -->
-        <header class="topbar">
-            <div>
-                <div class="eyebrow">INVENTORY</div>
-                <h1>Stock Control Center</h1>
-                <p class="page-description">
-                    Monitor stock levels, identify risks, and take action before products run out.
-                </p>
-            </div>
+        <!-- =====================================================
+             SHARED SIDEBAR
+             ===================================================== -->
 
-            <div class="topbar-actions">
-                <button class="secondary-btn" id="refreshBtn">
-                    ↻ Refresh
-                </button>
-
-                <button class="primary-btn" id="addStockBtn">
-                    + Add Stock
-                </button>
-            </div>
-        </header>
+        <div id="sharedSidebar"></div>
 
 
-        <!-- Store Selector -->
-        <section class="store-toolbar">
+        <!-- =====================================================
+             MAIN APPLICATION
+             ===================================================== -->
 
-            <div class="store-selector">
-                <label for="storeFilter">STORE</label>
+        <main class="main-content">
 
-                <select id="storeFilter">
-                    <option value="all">All Stores</option>
-                </select>
-            </div>
+            <!-- ================= HEADER ================= -->
 
-            <div class="inventory-search">
-                <span class="search-icon">⌕</span>
-                <input
-                    type="search"
-                    id="searchInput"
-                    placeholder="Search products..."
-                    autocomplete="off"
-                >
-            </div>
+            <header class="topbar">
 
-            <div class="filter-group">
+                <div class="topbar-copy">
 
-                <select id="categoryFilter">
-                    <option value="all">All Categories</option>
-                </select>
+                    <div class="eyebrow">
+                        INVENTORY INTELLIGENCE
+                    </div>
 
-                <select id="statusFilter">
-                    <option value="all">All Status</option>
-                    <option value="healthy">Healthy</option>
-                    <option value="low">Low Stock</option>
-                    <option value="stockout">Stock-out Risk</option>
-                    <option value="slow">Slow-moving</option>
-                </select>
+                    <h1>
+                        Stock Control Center
+                    </h1>
 
-                <select id="sortFilter">
-                    <option value="stock-low">Stock: Low → High</option>
-                    <option value="stock-high">Stock: High → Low</option>
-                    <option value="name">Product Name</option>
-                    <option value="days-low">Days Left: Low → High</option>
-                </select>
-
-            </div>
-
-        </section>
-
-
-        <!-- Status Tiles -->
-        <section class="status-grid">
-
-            <button class="status-card healthy" data-status="healthy">
-
-                <div class="status-card-top">
-                    <span class="status-icon">✓</span>
-                    <span class="status-arrow">→</span>
-                </div>
-
-                <div class="status-label">HEALTHY</div>
-
-                <div class="status-value" id="healthyCount">
-                    —
-                </div>
-
-                <div class="status-description">
-                    Products with sufficient stock
-                </div>
-
-            </button>
-
-
-            <button class="status-card low" data-status="low">
-
-                <div class="status-card-top">
-                    <span class="status-icon">!</span>
-                    <span class="status-arrow">→</span>
-                </div>
-
-                <div class="status-label">LOW STOCK</div>
-
-                <div class="status-value" id="lowCount">
-                    —
-                </div>
-
-                <div class="status-description">
-                    Products approaching reorder level
-                </div>
-
-            </button>
-
-
-            <button class="status-card stockout" data-status="stockout">
-
-                <div class="status-card-top">
-                    <span class="status-icon">!</span>
-                    <span class="status-arrow">→</span>
-                </div>
-
-                <div class="status-label">STOCK-OUT RISK</div>
-
-                <div class="status-value" id="stockoutCount">
-                    —
-                </div>
-
-                <div class="status-description">
-                    Products likely to run out soon
-                </div>
-
-            </button>
-
-
-            <button class="status-card slow" data-status="slow">
-
-                <div class="status-card-top">
-                    <span class="status-icon">◌</span>
-                    <span class="status-arrow">→</span>
-                </div>
-
-                <div class="status-label">SLOW-MOVING</div>
-
-                <div class="status-value" id="slowCount">
-                    —
-                </div>
-
-                <div class="status-description">
-                    High stock with weak recent sales
-                </div>
-
-            </button>
-
-        </section>
-<!-- Main Inventory Table -->
-        <section class="inventory-section">
-
-            <div class="section-header">
-
-                <div>
-                    <span class="section-kicker">STOCK REGISTER</span>
-                    <h2>Inventory</h2>
-                    <p>
-                        Select a product to inspect its stock position and evidence.
+                    <p class="page-description">
+                        See what you have, identify what is at risk,
+                        and act before inventory becomes a problem.
                     </p>
+
                 </div>
 
-                <button class="clear-filter-btn hidden" id="clearFilterBtn">
-                    Clear filter
+                <div class="topbar-actions">
+
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        id="refreshBtn"
+                    >
+                        <span>↻</span>
+                        Refresh
+                    </button>
+
+                    <button
+                        type="button"
+                        class="primary-btn"
+                        id="addStockBtn"
+                    >
+                        <span>+</span>
+                        Add Stock
+                    </button>
+
+                </div>
+
+            </header>
+
+
+            <!-- =====================================================
+                 CONTROL BAR
+                 ===================================================== -->
+
+            <section class="inventory-controls">
+
+                <div class="store-selector">
+
+                    <label for="storeFilter">
+                        STORE
+                    </label>
+
+                    <select id="storeFilter">
+                        <option value="all">
+                            All Stores
+                        </option>
+                    </select>
+
+                </div>
+
+
+                <div class="search-control">
+
+                    <span class="search-icon">
+                        ⌕
+                    </span>
+
+                    <input
+                        type="search"
+                        id="searchInput"
+                        placeholder="Search product, category or store..."
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <div class="filter-control">
+
+                    <select id="categoryFilter">
+
+                        <option value="all">
+                            All Categories
+                        </option>
+
+                    </select>
+
+
+                    <select id="statusFilter">
+
+                        <option value="all">
+                            All Status
+                        </option>
+
+                        <option value="healthy">
+                            Healthy
+                        </option>
+
+                        <option value="low">
+                            Low Stock
+                        </option>
+
+                        <option value="stockout">
+                            Stock-out Risk
+                        </option>
+
+                        <option value="slow">
+                            Slow-moving
+                        </option>
+
+                    </select>
+
+
+                    <select id="sortFilter">
+
+                        <option value="risk">
+                            Priority
+                        </option>
+
+                        <option value="days-low">
+                            Days Left: Low → High
+                        </option>
+
+                        <option value="stock-low">
+                            Stock: Low → High
+                        </option>
+
+                        <option value="stock-high">
+                            Stock: High → Low
+                        </option>
+
+                        <option value="name">
+                            Product Name
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="clear-filter-btn hidden"
+                    id="clearFilterBtn"
+                >
+                    Clear filters
                 </button>
 
-            </div>
+            </section>
 
 
-            <!-- Loading -->
-            <div class="table-state" id="loadingState">
-                <div class="loader"></div>
-                <p>Loading inventory...</p>
-            </div>
+            <!-- =====================================================
+                 INVENTORY REGISTER
+                 ===================================================== -->
 
+            <section class="inventory-section">
 
-            <!-- Error -->
-            <div class="table-state error-state hidden" id="errorState">
-                <div class="state-icon">!</div>
-                <h3>Unable to load inventory</h3>
-                <p id="errorMessage">
-                    Please check the backend connection and try again.
-                </p>
-                <button class="secondary-btn" id="retryBtn">
-                    Try Again
-                </button>
-            </div>
+                <div class="section-header">
 
+                    <div>
 
-            <!-- Empty -->
-            <div class="table-state hidden" id="emptyState">
-                <div class="state-icon">⌕</div>
-                <h3>No matching products</h3>
-                <p>
-                    Try changing your search or filter.
-                </p>
-            </div>
+                        <span class="section-kicker">
+                            STOCK REGISTER
+                        </span>
 
+                        <h2>
+                            Inventory
+                        </h2>
 
-            <!-- Table -->
-            <div class="table-wrapper hidden" id="tableWrapper">
+                        <p>
+                            Select any product to inspect its current
+                            stock position, sales velocity and evidence.
+                        </p>
 
-                <table class="inventory-table">
+                    </div>
 
-                    <thead>
-                        <tr>
-                            <th>PRODUCT</th>
-                            <th>CATEGORY</th>
-                            <th>STORE</th>
-                            <th>STOCK</th>
-                            <th>AVG. DAILY SALES</th>
-                            <th>DAYS LEFT</th>
-                            <th>STATUS</th>
-                            <th>ACTION</th>
-                        </tr>
-                    </thead>
+                    <div class="register-meta">
 
-                    <tbody id="inventoryTableBody">
-                    </tbody>
+                        <span id="registerState">
+                            Ready
+                        </span>
 
-                </table>
+                    </div>
 
-            </div>
-
-        </section>
-
-        <!-- Inventory Summary -->
-        <section class="inventory-summary">
-
-            <div class="summary-heading">
-                <div>
-                    <span class="section-kicker">INVENTORY OVERVIEW</span>
-                    <h2>Current Stock Position</h2>
                 </div>
 
-                <span class="record-count" id="recordCount">
-                    0 products
-                </span>
-            </div>
 
-            <div class="summary-metrics">
+                <!-- ================= LOADING ================= -->
+
+                <div
+                    class="table-state"
+                    id="loadingState"
+                >
+
+                    <div class="loader"></div>
+
+                    <h3>
+                        Loading inventory
+                    </h3>
+
+                    <p>
+                        Synchronising stock and sales signals...
+                    </p>
+
+                </div>
+
+
+                <!-- ================= ERROR ================= -->
+
+                <div
+                    class="table-state error-state hidden"
+                    id="errorState"
+                >
+
+                    <div class="state-icon">
+                        !
+                    </div>
+
+                    <h3>
+                        Unable to load inventory
+                    </h3>
+
+                    <p id="errorMessage">
+                        Please check the backend connection.
+                    </p>
+
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        id="retryBtn"
+                    >
+                        Try Again
+                    </button>
+
+                </div>
+
+
+                <!-- ================= EMPTY ================= -->
+
+                <div
+                    class="table-state hidden"
+                    id="emptyState"
+                >
+
+                    <div class="state-icon">
+                        ⌕
+                    </div>
+
+                    <h3>
+                        No matching inventory
+                    </h3>
+
+                    <p>
+                        Try another store, category, status or search term.
+                    </p>
+
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        id="emptyClearBtn"
+                    >
+                        Clear Filters
+                    </button>
+
+                </div>
+
+
+                <!-- ================= TABLE ================= -->
+
+                <div
+                    class="table-wrapper hidden"
+                    id="tableWrapper"
+                >
+
+                    <table class="inventory-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    PRODUCT
+                                </th>
+
+                                <th>
+                                    CATEGORY
+                                </th>
+
+                                <th>
+                                    STORE
+                                </th>
+
+                                <th>
+                                    STOCK
+                                </th>
+
+                                <th>
+                                    AVG. DAILY SALES
+                                </th>
+
+                                <th>
+                                    DAYS LEFT
+                                </th>
+
+                                <th>
+                                    STATUS
+                                </th>
+
+                                <th>
+                                    ACTION
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="inventoryTableBody">
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+
+            <!-- =====================================================
+                 INVENTORY HEALTH
+                 ===================================================== -->
+
+            <section class="health-section">
+
+                <div class="section-heading-row">
+
+                    <div>
+
+                        <span class="section-kicker">
+                            INVENTORY HEALTH
+                        </span>
+
+                        <h2>
+                            Stock status at a glance
+                        </h2>
+
+                    </div>
+
+                    <span
+                        class="health-caption"
+                        id="healthCaption"
+                    >
+                        Calculated from current stock and available sales signals
+                    </span>
+
+                </div>
+
+
+                <div class="status-grid">
+
+                    <!-- ================= HEALTHY ================= -->
+
+                    <button
+                        type="button"
+                        class="status-card healthy"
+                        data-status="healthy"
+                    >
+
+                        <div class="status-card-top">
+
+                            <span class="status-icon">
+                                ✓
+                            </span>
+
+                            <span class="status-arrow">
+                                →
+                            </span>
+
+                        </div>
+
+                        <div class="status-label">
+                            HEALTHY
+                        </div>
+
+                        <div
+                            class="status-value"
+                            id="healthyCount"
+                        >
+                            —
+                        </div>
+
+                        <div class="status-description">
+                            Sufficient stock coverage
+                        </div>
+
+                    </button>
+
+
+                    <!-- ================= LOW ================= -->
+
+                    <button
+                        type="button"
+                        class="status-card low"
+                        data-status="low"
+                    >
+
+                        <div class="status-card-top">
+
+                            <span class="status-icon">
+                                !
+                            </span>
+
+                            <span class="status-arrow">
+                                →
+                            </span>
+
+                        </div>
+
+                        <div class="status-label">
+                            LOW STOCK
+                        </div>
+
+                        <div
+                            class="status-value"
+                            id="lowCount"
+                        >
+                            —
+                        </div>
+
+                        <div class="status-description">
+                            Approaching reorder level
+                        </div>
+
+                    </button>
+
+
+                    <!-- ================= STOCKOUT ================= -->
+
+                    <button
+                        type="button"
+                        class="status-card stockout"
+                        data-status="stockout"
+                    >
+
+                        <div class="status-card-top">
+
+                            <span class="status-icon">
+                                !
+                            </span>
+
+                            <span class="status-arrow">
+                                →
+                            </span>
+
+                        </div>
+
+                        <div class="status-label">
+                            STOCK-OUT RISK
+                        </div>
+
+                        <div
+                            class="status-value"
+                            id="stockoutCount"
+                        >
+                            —
+                        </div>
+
+                        <div class="status-description">
+                            Requires immediate review
+                        </div>
+
+                    </button>
+
+
+                    <!-- ================= SLOW ================= -->
+
+                    <button
+                        type="button"
+                        class="status-card slow"
+                        data-status="slow"
+                    >
+
+                        <div class="status-card-top">
+
+                            <span class="status-icon">
+                                ◌
+                            </span>
+
+                            <span class="status-arrow">
+                                →
+                            </span>
+
+                        </div>
+
+                        <div class="status-label">
+                            SLOW-MOVING
+                        </div>
+
+                        <div
+                            class="status-value"
+                            id="slowCount"
+                        >
+                            —
+                        </div>
+
+                        <div class="status-description">
+                            High stock with weak sales velocity
+                        </div>
+
+                    </button>
+
+                </div>
+
+            </section>
+
+
+            <!-- =====================================================
+                 KPI STRIP
+                 ===================================================== -->
+
+            <section class="inventory-summary">
 
                 <div class="summary-metric">
-                    <span>Total Stock</span>
-                    <strong id="totalStock">—</strong>
-                    <small>units across selected stores</small>
+
+                    <span>
+                        Total Stock
+                    </span>
+
+                    <strong id="totalStock">
+                        —
+                    </strong>
+
+                    <small>
+                        units
+                    </small>
+
                 </div>
 
+
                 <div class="summary-metric">
-                    <span>Products</span>
-                    <strong id="totalProducts">—</strong>
-                    <small>products in catalogue</small>
+
+                    <span>
+                        Products
+                    </span>
+
+                    <strong id="totalProducts">
+                        —
+                    </strong>
+
+                    <small>
+                        unique products
+                    </small>
+
                 </div>
+
 
                 <div class="summary-metric danger">
-                    <span>Immediate Risk</span>
-                    <strong id="immediateRisk">—</strong>
-                    <small>stock-out risk products</small>
+
+                    <span>
+                        Immediate Risk
+                    </span>
+
+                    <strong id="immediateRisk">
+                        —
+                    </strong>
+
+                    <small>
+                        low / stock-out
+                    </small>
+
                 </div>
+
 
                 <div class="summary-metric warning">
-                    <span>Excess Risk</span>
-                    <strong id="excessRisk">—</strong>
-                    <small>slow-moving products</small>
+
+                    <span>
+                        Excess Risk
+                    </span>
+
+                    <strong id="excessRisk">
+                        —
+                    </strong>
+
+                    <small>
+                        slow-moving
+                    </small>
+
                 </div>
 
-            </div>
 
-        </section>
+                <div class="summary-metric">
 
+                    <span>
+                        Visible Records
+                    </span>
 
-        
+                    <strong id="recordCount">
+                        —
+                    </strong>
 
+                    <small>
+                        after filters
+                    </small>
 
-        <!-- Attention Section -->
-        <section class="attention-section">
-
-            <div class="section-header">
-
-                <div>
-                    <span class="section-kicker">ACTION CENTER</span>
-                    <h2>Needs Attention</h2>
-                    <p>
-                        Inventory conditions that may require manager action.
-                    </p>
                 </div>
 
-                <a href="/#attention" class="view-all-link">
-                    View dashboard →
-                </a>
-
-            </div>
-
-            <div class="attention-grid" id="attentionGrid">
-                <!-- Filled by JS -->
-            </div>
-
-        </section>
+            </section>
 
 
-        <!-- Stock Movement -->
-        <section class="movement-section">
+            <!-- =====================================================
+                 ACTION CENTER
+                 ===================================================== -->
 
-            <div class="section-header">
+            <section class="attention-section">
 
-                <div>
-                    <span class="section-kicker">STOCK MOVEMENT</span>
-                    <h2>Inventory Movement</h2>
-                    <p>
-                        Select a product from the inventory table to inspect its movement.
-                    </p>
-                </div>
+                <div class="section-header">
 
-                <div class="selected-product" id="selectedProduct">
-                    No product selected
-                </div>
+                    <div>
 
-            </div>
+                        <span class="section-kicker">
+                            ACTION CENTER
+                        </span>
 
-            <div class="movement-card">
+                        <h2>
+                            Needs Attention
+                        </h2>
 
-                <div class="movement-empty" id="movementEmpty">
-                    <div class="movement-icon">↗</div>
-                    <h3>Select a product</h3>
-                    <p>
-                        Product movement information will appear here.
-                    </p>
-                </div>
-
-                <div class="movement-content hidden" id="movementContent">
-
-                    <div class="movement-stats">
-
-                        <div>
-                            <span>Current Stock</span>
-                            <strong id="movementStock">—</strong>
-                        </div>
-
-                        <div>
-                            <span>30-Day Sales</span>
-                            <strong id="movementSales">—</strong>
-                        </div>
-
-                        <div>
-                            <span>Average Daily Sales</span>
-                            <strong id="movementDaily">—</strong>
-                        </div>
-
-                        <div>
-                            <span>Estimated Days Left</span>
-                            <strong id="movementDays">—</strong>
-                        </div>
+                        <p>
+                            Signals generated from the inventory intelligence layer.
+                        </p>
 
                     </div>
 
-                    <div class="movement-bar-area">
-
-                        <div class="movement-bar-label">
-                            <span>Stock position</span>
-                            <span id="movementPercent">—</span>
-                        </div>
-
-                        <div class="movement-bar">
-                            <div id="movementBarFill"></div>
-                        </div>
-
-                    </div>
+                    <a
+                        href="/#attention"
+                        class="view-all-link"
+                    >
+                        View dashboard →
+                    </a>
 
                 </div>
 
-            </div>
 
-        </section>
+                <div
+                    class="attention-grid"
+                    id="attentionGrid"
+                >
+                </div>
 
-    </main>
+            </section>
 
 
-    <!-- Product Details Modal -->
-    <div class="modal-overlay hidden" id="productModal">
 
-        <div class="product-modal">
+        </main>
 
-            <button class="modal-close" id="closeProductModal">
+    </div>
+
+
+    <!-- =========================================================
+         PRODUCT DETAILS MODAL
+         ========================================================= -->
+
+    <div
+        class="modal-overlay hidden"
+        id="productModal"
+    >
+
+        <div
+            class="product-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modalProductName"
+        >
+
+            <button
+                type="button"
+                class="modal-close"
+                id="closeProductModal"
+                aria-label="Close"
+            >
                 ×
             </button>
 
+
             <div class="modal-eyebrow">
-                PRODUCT INVENTORY
+                PRODUCT INTELLIGENCE
             </div>
+
 
             <h2 id="modalProductName">
                 Product
             </h2>
 
-            <div class="modal-product-meta" id="modalProductMeta">
+
+            <div
+                class="modal-product-meta"
+                id="modalProductMeta"
+            >
                 —
             </div>
 
 
-            <div class="modal-status" id="modalStatus">
+            <div
+                class="modal-status"
+                id="modalStatus"
+            >
                 —
             </div>
 
@@ -428,27 +749,70 @@
             <div class="detail-grid">
 
                 <div class="detail-box">
-                    <span>Current Stock</span>
-                    <strong id="modalStock">—</strong>
-                    <small>units</small>
+
+                    <span>
+                        Current Stock
+                    </span>
+
+                    <strong id="modalStock">
+                        —
+                    </strong>
+
+                    <small>
+                        units
+                    </small>
+
                 </div>
 
-                <div class="detail-box">
-                    <span>Avg. Daily Sales</span>
-                    <strong id="modalDailySales">—</strong>
-                    <small>units/day</small>
-                </div>
 
                 <div class="detail-box">
-                    <span>Days Remaining</span>
-                    <strong id="modalDaysLeft">—</strong>
-                    <small>estimated</small>
+
+                    <span>
+                        Avg. Daily Sales
+                    </span>
+
+                    <strong id="modalDailySales">
+                        —
+                    </strong>
+
+                    <small>
+                        units/day
+                    </small>
+
                 </div>
 
+
                 <div class="detail-box">
-                    <span>30-Day Sales</span>
-                    <strong id="modal30DaySales">—</strong>
-                    <small>units</small>
+
+                    <span>
+                        Days Remaining
+                    </span>
+
+                    <strong id="modalDaysLeft">
+                        —
+                    </strong>
+
+                    <small>
+                        estimated
+                    </small>
+
+                </div>
+
+
+                <div class="detail-box">
+
+                    <span>
+                        30-Day Sales
+                    </span>
+
+                    <strong id="modal30DaySales">
+                        —
+                    </strong>
+
+                    <small>
+                        units
+                    </small>
+
                 </div>
 
             </div>
@@ -474,7 +838,7 @@
                 </div>
 
                 <div id="modalEvidence">
-                    —
+                    Loading evidence...
                 </div>
 
             </div>
@@ -482,12 +846,20 @@
 
             <div class="modal-actions">
 
-                <button class="secondary-btn" id="modalCloseBtn">
+                <button
+                    type="button"
+                    class="secondary-btn"
+                    id="modalCloseBtn"
+                >
                     Close
                 </button>
 
-                <button class="primary-btn" id="modalActionBtn">
-                    View Evidence
+                <button
+                    type="button"
+                    class="primary-btn"
+                    id="modalActionBtn"
+                >
+                    Add Stock
                 </button>
 
             </div>
@@ -497,44 +869,88 @@
     </div>
 
 
-    <!-- Add Stock Modal -->
-    <div class="modal-overlay hidden" id="stockModal">
+    <!-- =========================================================
+         ADD STOCK MODAL
+         ========================================================= -->
 
-        <div class="stock-modal">
+    <div
+        class="modal-overlay hidden"
+        id="stockModal"
+    >
 
-            <button class="modal-close" id="closeStockModal">
+        <div
+            class="stock-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stockModalTitle"
+        >
+
+            <button
+                type="button"
+                class="modal-close"
+                id="closeStockModal"
+                aria-label="Close"
+            >
                 ×
             </button>
+
 
             <div class="modal-eyebrow">
                 INVENTORY UPDATE
             </div>
 
-            <h2>Add Stock</h2>
+
+            <h2 id="stockModalTitle">
+                Add Stock
+            </h2>
+
 
             <p class="modal-description">
-                Record incoming stock for a product.
+                Record incoming stock. The quantity entered is added
+                to the current inventory balance.
             </p>
+
 
             <form id="stockForm">
 
-                <label>
+                <label for="stockStore">
+
                     Store
 
-                    <select id="stockStore" required>
-                        <option value="">Select store</option>
+                    <select
+                        id="stockStore"
+                        required
+                    >
+
+                        <option value="">
+                            Select store
+                        </option>
+
                     </select>
+
                 </label>
 
-                <label>
+
+                <label for="stockProduct">
+
                     Product
 
-                    <select id="stockProduct" required>
-                        <option value="">Select product</option>
+                    <select
+                        id="stockProduct"
+                        required
+                    >
+
+                        <option value="">
+                            Select product
+                        </option>
+
                     </select>
+
                 </label>
 
-                <label>
+
+                <label for="stockQuantity">
+
                     Quantity
 
                     <input
@@ -542,22 +958,32 @@
                         id="stockQuantity"
                         min="1"
                         step="1"
-                        placeholder="Enter quantity"
+                        placeholder="e.g. 25"
                         required
                     >
+
                 </label>
 
-                <label>
+
+                <label for="stockReason">
+
                     Reason
 
                     <input
                         type="text"
                         id="stockReason"
-                        placeholder="Example: New shipment"
+                        placeholder="e.g. New shipment"
+                        value="replenishment"
                     >
+
                 </label>
 
-                <div class="form-error hidden" id="stockFormError"></div>
+
+                <div
+                    class="form-error hidden"
+                    id="stockFormError"
+                ></div>
+
 
                 <div class="modal-actions">
 
@@ -586,35 +1012,67 @@
     </div>
 
 
-    <!-- Sidebar -->
+    <!-- =========================================================
+         SCRIPTS
+         ========================================================= -->
+
     <script src="/static/sidebar.js"></script>
+
 
     <script>
         async function loadSidebar() {
+
             try {
-                const response = await fetch("/static/sidebar.html");
+
+                const response =
+                    await fetch("/static/sidebar.html");
 
                 if (!response.ok) {
                     throw new Error("Sidebar failed to load");
                 }
 
-                const html = await response.text();
+                const html =
+                    await response.text();
 
-                document.getElementById("sharedSidebar").innerHTML = html;
+                const target =
+                    document.getElementById("sharedSidebar");
+
+                if (target) {
+                    target.innerHTML = html;
+                }
 
                 if (typeof initializeSidebar === "function") {
                     initializeSidebar();
                 }
 
+                requestAnimationFrame(() => {
+
+                    const event =
+                        new CustomEvent(
+                            "storesense-sidebar-ready"
+                        );
+
+                    document.dispatchEvent(event);
+
+                });
+
             } catch (error) {
-                console.error("Sidebar error:", error);
+
+                console.error(
+                    "Sidebar error:",
+                    error
+                );
+
             }
+
         }
 
         loadSidebar();
     </script>
 
+
     <script src="/static/inventory.js"></script>
 
 </body>
+
 </html>

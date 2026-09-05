@@ -1,5 +1,11 @@
 /* =========================================================
-   STORESENSE — INVENTORY
+   STORESENSE — INVENTORY CONTROL CENTER
+   Responsive • Sidebar-compatible • Startup-grade
+   ========================================================= */
+
+
+/* =========================================================
+   DESIGN TOKENS
    ========================================================= */
 
 :root {
@@ -33,29 +39,50 @@
 
     --shadow-sm: 0 2px 10px rgba(32, 26, 18, 0.05);
     --shadow-md: 0 8px 30px rgba(32, 26, 18, 0.08);
+    --shadow-lg: 0 18px 55px rgba(32, 26, 18, 0.12);
 
     --radius: 14px;
+    --radius-sm: 9px;
 }
 
 
 /* =========================================================
-   BASE
+   RESET
    ========================================================= */
 
 * {
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     margin: 0;
-    background: var(--cream);
+    min-height: 100vh;
+
+    background:
+        radial-gradient(
+            circle at top right,
+            rgba(164, 123, 44, 0.045),
+            transparent 30%
+        ),
+        var(--cream);
+
     color: var(--ink);
+
     font-family:
         Inter,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
         sans-serif;
+
+    -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -68,18 +95,95 @@ button {
     cursor: pointer;
 }
 
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+a {
+    color: inherit;
+}
+
 .hidden {
     display: none !important;
 }
 
 
 /* =========================================================
-   MAIN
+   APPLICATION SHELL
+   ========================================================= */
+
+/*
+   inventory.html uses:
+
+   .app-shell
+       ├── #sharedSidebar
+       └── .main-content
+
+   The shell controls the horizontal layout.
+   Inventory does NOT manually reserve sidebar space.
+*/
+
+.app-shell {
+    display: flex;
+    align-items: stretch;
+
+    width: 100%;
+    min-height: 100vh;
+}
+
+
+/* =========================================================
+   SIDEBAR CONTAINER
+   ========================================================= */
+
+/*
+   sidebar.css owns the actual sidebar styling.
+
+   This wrapper must not impose a second layout system.
+*/
+
+#sharedSidebar {
+    flex-shrink: 0;
+}
+
+
+/* =========================================================
+   MAIN CONTENT
    ========================================================= */
 
 .main-content {
+    flex: 1;
+
+    width: auto;
+    min-width: 0;
     min-height: 100vh;
-    padding: 42px 46px 70px;
+
+    padding:
+        clamp(28px, 4vw, 48px)
+        clamp(18px, 4vw, 52px)
+        80px;
+
+    overflow-x: hidden;
+}
+
+
+/*
+   Prevent sections from becoming excessively wide.
+*/
+
+.topbar,
+.inventory-controls,
+.health-section,
+.inventory-summary,
+.inventory-section,
+.attention-section,
+.movement-section {
+    width: 100%;
+    max-width: 1500px;
+
+    margin-left: auto;
+    margin-right: auto;
 }
 
 
@@ -91,10 +195,14 @@ button {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 30px;
 
-    max-width: 1500px;
-    margin: 0 auto 34px;
+    gap: 32px;
+
+    margin-bottom: 34px;
+}
+
+.topbar-copy {
+    min-width: 0;
 }
 
 .eyebrow,
@@ -106,25 +214,32 @@ button {
 
     color: var(--gold-dark);
 
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
-    letter-spacing: 0.16em;
+
+    letter-spacing: 0.17em;
+    line-height: 1.3;
 }
 
 .topbar h1 {
     margin: 0;
 
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
-    font-size: clamp(30px, 4vw, 46px);
+    font-size: clamp(32px, 4vw, 48px);
     font-weight: 500;
+
+    letter-spacing: -0.025em;
     line-height: 1.05;
 }
 
 .page-description {
-    max-width: 650px;
+    max-width: 680px;
 
-    margin: 12px 0 0;
+    margin: 13px 0 0;
 
     color: var(--ink-soft);
 
@@ -134,7 +249,10 @@ button {
 
 .topbar-actions {
     display: flex;
+    align-items: center;
+
     gap: 10px;
+
     flex-shrink: 0;
 }
 
@@ -145,88 +263,117 @@ button {
 
 .primary-btn,
 .secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
     min-height: 42px;
 
     padding: 0 17px;
 
-    border-radius: 9px;
+    border-radius: var(--radius-sm);
 
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 750;
+
+    white-space: nowrap;
 
     transition:
         transform 0.18s ease,
-        box-shadow 0.18s ease,
-        background 0.18s ease;
+        border-color 0.18s ease,
+        background 0.18s ease,
+        box-shadow 0.18s ease;
 }
 
 .primary-btn {
     border: 1px solid var(--ink);
+
     background: var(--ink);
-    color: white;
+    color: var(--white);
 }
 
 .primary-btn:hover {
     transform: translateY(-1px);
+
+    background: #292621;
+
     box-shadow: var(--shadow-sm);
+}
+
+.primary-btn:active {
+    transform: translateY(0);
 }
 
 .secondary-btn {
     border: 1px solid var(--line);
+
     background: var(--paper);
     color: var(--ink);
 }
 
 .secondary-btn:hover {
     border-color: var(--gold);
+
     background: var(--white);
+
+    box-shadow: var(--shadow-sm);
+}
+
+.primary-btn span,
+.secondary-btn span {
+    margin-right: 6px;
 }
 
 
 /* =========================================================
-   STORE TOOLBAR
+   INVENTORY CONTROLS
    ========================================================= */
 
-.store-toolbar {
+.inventory-controls {
     display: grid;
-    grid-template-columns: 180px minmax(240px, 1fr) auto;
+
+    grid-template-columns:
+        190px
+        minmax(250px, 1fr)
+        minmax(420px, auto)
+        auto;
 
     align-items: end;
-    gap: 14px;
 
-    max-width: 1500px;
-    margin: 0 auto 20px;
+    gap: 10px;
 
-    padding: 16px;
+    margin-bottom: 24px;
+
+    padding: 14px;
 
     border: 1px solid var(--line);
     border-radius: var(--radius);
 
-    background: rgba(255, 253, 248, 0.8);
+    background: rgba(255, 253, 248, 0.86);
 
     box-shadow: var(--shadow-sm);
+
+    backdrop-filter: blur(8px);
 }
 
 .store-selector label {
     display: block;
 
-    margin-bottom: 7px;
+    margin-bottom: 6px;
 
     color: var(--muted);
 
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 800;
-    letter-spacing: 0.12em;
+
+    letter-spacing: 0.13em;
 }
 
 .store-selector select,
-.filter-group select,
-.stock-modal select,
-.stock-modal input {
+.search-control input,
+.filter-control select {
     width: 100%;
     height: 42px;
-
-    padding: 0 12px;
 
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -236,18 +383,36 @@ button {
     background: var(--white);
     color: var(--ink);
 
-    font-size: 13px;
+    font-size: 12px;
+
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
 }
 
-select:focus,
-input:focus {
+.store-selector select,
+.filter-control select {
+    padding: 0 11px;
+}
+
+.store-selector select:focus,
+.search-control input:focus,
+.filter-control select:focus {
     border-color: var(--gold);
 
-    box-shadow: 0 0 0 3px rgba(164, 123, 44, 0.1);
+    box-shadow:
+        0 0 0 3px rgba(164, 123, 44, 0.10);
 }
 
-.inventory-search {
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+.search-control {
     position: relative;
+
+    min-width: 0;
 }
 
 .search-icon {
@@ -256,75 +421,201 @@ input:focus {
     left: 13px;
     top: 50%;
 
+    z-index: 2;
+
     transform: translateY(-50%);
 
     color: var(--muted);
 
-    font-size: 19px;
+    font-size: 18px;
+
+    pointer-events: none;
 }
 
-.inventory-search input {
-    width: 100%;
-    height: 42px;
-
-    padding: 0 14px 0 39px;
-
-    border: 1px solid var(--line);
-    border-radius: 8px;
-
-    outline: none;
-
-    background: var(--white);
-
-    color: var(--ink);
-
-    font-size: 13px;
+.search-control input {
+    padding: 0 13px 0 38px;
 }
 
-.filter-group {
-    display: flex;
-    gap: 8px;
-}
-
-.filter-group select {
-    min-width: 145px;
+.search-control input::placeholder {
+    color: #aaa39a;
 }
 
 
 /* =========================================================
-   STATUS CARDS
+   FILTERS
    ========================================================= */
+
+.filter-control {
+    display: grid;
+
+    grid-template-columns:
+        minmax(135px, 1fr)
+        minmax(135px, 1fr)
+        minmax(145px, 1fr);
+
+    gap: 8px;
+
+    min-width: 0;
+}
+
+.clear-filter-btn {
+    min-height: 42px;
+
+    padding: 0 12px;
+
+    border: 1px solid transparent;
+    border-radius: 8px;
+
+    background: var(--gold-light);
+    color: var(--gold-dark);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    white-space: nowrap;
+}
+
+.clear-filter-btn:hover {
+    border-color: rgba(164, 123, 44, 0.25);
+
+    background: #eadbb9;
+}
+
+
+/* =========================================================
+   SECTION HEADINGS
+   ========================================================= */
+
+.section-heading-row,
+.section-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    margin-bottom: 13px;
+}
+
+.section-heading-row h2,
+.section-header h2 {
+    margin: 0;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 25px;
+    font-weight: 500;
+
+    letter-spacing: -0.015em;
+}
+
+.section-header p {
+    max-width: 750px;
+
+    margin: 7px 0 0;
+
+    color: var(--ink-soft);
+
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.health-caption {
+    max-width: 420px;
+
+    color: var(--muted);
+
+    font-size: 10px;
+
+    text-align: right;
+}
+
+.register-meta {
+    flex-shrink: 0;
+
+    padding: 7px 10px;
+
+    border: 1px solid var(--line-light);
+    border-radius: 20px;
+
+    background: var(--paper);
+
+    color: var(--muted);
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.view-all-link {
+    flex-shrink: 0;
+
+    color: var(--gold-dark);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    text-decoration: none;
+}
+
+.view-all-link:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   INVENTORY SECTION
+   ========================================================= */
+
+.inventory-section,
+.attention-section,
+.movement-section {
+    margin-bottom: 34px;
+}
+
+
+/* =========================================================
+   STATUS / INVENTORY HEALTH
+   ========================================================= */
+
+.health-section {
+    margin-bottom: 24px;
+}
 
 .status-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
 
-    gap: 14px;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
 
-    max-width: 1500px;
-    margin: 0 auto 22px;
+    gap: 12px;
 }
 
 .status-card {
     position: relative;
 
-    min-height: 165px;
+    min-width: 0;
+    min-height: 158px;
 
-    padding: 20px;
+    padding: 19px;
 
     border: 1px solid var(--line);
     border-radius: var(--radius);
 
-    text-align: left;
-
     background: var(--paper);
+
+    color: var(--ink);
+
+    text-align: left;
 
     box-shadow: var(--shadow-sm);
 
     transition:
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease;
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
 }
 
 .status-card:hover {
@@ -337,15 +628,18 @@ input:focus {
 
 .status-card.active {
     border-color: var(--gold);
-    box-shadow: 0 0 0 2px rgba(164, 123, 44, 0.12);
+
+    box-shadow:
+        0 0 0 2px rgba(164, 123, 44, 0.11),
+        var(--shadow-sm);
 }
 
 .status-card-top {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
 
-    margin-bottom: 22px;
+    margin-bottom: 19px;
 }
 
 .status-icon {
@@ -357,16 +651,16 @@ input:focus {
 
     border-radius: 50%;
 
-    font-weight: 800;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 900;
 }
 
 .status-arrow {
     color: var(--muted);
 
-    font-size: 18px;
+    font-size: 17px;
 
-    transition: transform 0.2s ease;
+    transition: transform 0.18s ease;
 }
 
 .status-card:hover .status-arrow {
@@ -376,16 +670,22 @@ input:focus {
 .status-label {
     margin-bottom: 4px;
 
-    font-size: 10px;
-    font-weight: 800;
+    font-size: 9px;
+    font-weight: 850;
+
     letter-spacing: 0.13em;
 }
 
 .status-value {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
     font-size: 34px;
-    line-height: 1.1;
+    font-weight: 500;
+
+    line-height: 1.05;
 }
 
 .status-description {
@@ -393,8 +693,14 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 11px;
+    font-size: 10px;
+    line-height: 1.4;
 }
+
+
+/* =========================================================
+   STATUS COLORS
+   ========================================================= */
 
 .status-card.healthy .status-icon {
     background: var(--green-bg);
@@ -434,68 +740,35 @@ input:focus {
 
 
 /* =========================================================
-   INVENTORY SUMMARY
+   KPI SUMMARY
    ========================================================= */
 
 .inventory-summary {
-    max-width: 1500px;
+    display: grid;
 
-    margin: 0 auto 22px;
+    grid-template-columns:
+        repeat(5, minmax(0, 1fr));
 
-    padding: 24px;
+    margin-bottom: 30px;
+
+    padding: 0;
 
     border: 1px solid var(--line);
     border-radius: var(--radius);
 
+    overflow: hidden;
+
     background: var(--paper);
-}
 
-.summary-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-
-    margin-bottom: 22px;
-}
-
-.summary-heading h2,
-.section-header h2 {
-    margin: 0;
-
-    font-family: Georgia, "Times New Roman", serif;
-
-    font-size: 25px;
-    font-weight: 500;
-}
-
-.record-count {
-    padding: 7px 11px;
-
-    border-radius: 20px;
-
-    background: var(--cream-dark);
-
-    color: var(--ink-soft);
-
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.summary-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-
-    border-top: 1px solid var(--line-light);
+    box-shadow: var(--shadow-sm);
 }
 
 .summary-metric {
-    padding: 18px 20px;
+    min-width: 0;
+
+    padding: 20px;
 
     border-right: 1px solid var(--line-light);
-}
-
-.summary-metric:first-child {
-    padding-left: 0;
 }
 
 .summary-metric:last-child {
@@ -509,26 +782,32 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 650;
 }
 
 .summary-metric strong {
     display: block;
 
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
     font-size: 28px;
     font-weight: 500;
+
+    line-height: 1.1;
 }
 
 .summary-metric small {
     display: block;
 
-    margin-top: 4px;
+    margin-top: 5px;
 
     color: var(--muted);
 
-    font-size: 10px;
+    font-size: 9px;
 }
 
 .summary-metric.danger strong {
@@ -541,69 +820,13 @@ input:focus {
 
 
 /* =========================================================
-   SECTIONS
-   ========================================================= */
-
-.inventory-section,
-.attention-section,
-.movement-section {
-    max-width: 1500px;
-
-    margin: 0 auto 28px;
-}
-
-.section-header {
-    display: flex;
-
-    align-items: flex-end;
-    justify-content: space-between;
-
-    gap: 20px;
-
-    margin-bottom: 14px;
-}
-
-.section-header p {
-    margin: 7px 0 0;
-
-    color: var(--ink-soft);
-
-    font-size: 12px;
-}
-
-.clear-filter-btn {
-    border: 0;
-
-    padding: 7px 12px;
-
-    border-radius: 7px;
-
-    background: var(--gold-light);
-    color: var(--gold-dark);
-
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.view-all-link {
-    color: var(--gold-dark);
-
-    font-size: 12px;
-    font-weight: 700;
-
-    text-decoration: none;
-}
-
-.view-all-link:hover {
-    text-decoration: underline;
-}
-
-
-/* =========================================================
    TABLE
    ========================================================= */
 
 .table-wrapper {
+    width: 100%;
+    max-width: 100%;
+
     overflow-x: auto;
 
     border: 1px solid var(--line);
@@ -612,18 +835,19 @@ input:focus {
     background: var(--paper);
 
     box-shadow: var(--shadow-sm);
+
+    scrollbar-width: thin;
 }
 
 .inventory-table {
     width: 100%;
+    min-width: 980px;
 
     border-collapse: collapse;
-
-    min-width: 950px;
 }
 
 .inventory-table th {
-    padding: 14px 16px;
+    padding: 13px 15px;
 
     border-bottom: 1px solid var(--line);
 
@@ -631,10 +855,10 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 8px;
+    font-weight: 850;
 
-    letter-spacing: 0.1em;
+    letter-spacing: 0.11em;
 
     text-align: left;
 
@@ -642,21 +866,21 @@ input:focus {
 }
 
 .inventory-table td {
-    padding: 16px;
+    padding: 15px;
 
     border-bottom: 1px solid var(--line-light);
 
     color: var(--ink);
 
-    font-size: 12px;
+    font-size: 11px;
 
     vertical-align: middle;
 }
 
 .inventory-table tbody tr {
-    cursor: pointer;
-
-    transition: background 0.15s ease;
+    transition:
+        background 0.15s ease,
+        box-shadow 0.15s ease;
 }
 
 .inventory-table tbody tr:hover {
@@ -667,8 +891,23 @@ input:focus {
     border-bottom: 0;
 }
 
+
+/* =========================================================
+   PRODUCT
+   ========================================================= */
+
 .product-name {
-    font-weight: 750;
+    display: block;
+
+    max-width: 220px;
+
+    overflow: hidden;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .product-id {
@@ -678,23 +917,32 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 10px;
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Consolas,
+        monospace;
+
+    font-size: 9px;
 }
 
-.category-text {
-    color: var(--ink-soft);
-}
-
+.category-text,
 .store-text {
     color: var(--ink-soft);
 }
 
+
+/* =========================================================
+   STOCK
+   ========================================================= */
+
 .stock-number {
-    font-weight: 800;
+    font-weight: 850;
 }
 
 .stock-bar {
-    width: 70px;
+    width: 72px;
     height: 4px;
 
     margin-top: 6px;
@@ -707,6 +955,7 @@ input:focus {
 }
 
 .stock-bar-fill {
+    width: 0;
     height: 100%;
 
     border-radius: inherit;
@@ -728,8 +977,13 @@ input:focus {
     background: var(--purple);
 }
 
+
+/* =========================================================
+   DAYS LEFT
+   ========================================================= */
+
 .days-left {
-    font-weight: 750;
+    font-weight: 800;
 }
 
 .days-left.risk {
@@ -748,18 +1002,23 @@ input:focus {
     color: var(--ink-soft);
 }
 
+
+/* =========================================================
+   STATUS PILL
+   ========================================================= */
+
 .status-pill {
     display: inline-flex;
-
     align-items: center;
+
     gap: 5px;
 
     padding: 6px 9px;
 
     border-radius: 20px;
 
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 8px;
+    font-weight: 850;
 
     white-space: nowrap;
 }
@@ -769,6 +1028,8 @@ input:focus {
 
     width: 5px;
     height: 5px;
+
+    flex-shrink: 0;
 
     border-radius: 50%;
 
@@ -795,22 +1056,31 @@ input:focus {
     color: var(--purple);
 }
 
+
+/* =========================================================
+   TABLE ACTION
+   ========================================================= */
+
 .table-action {
+    padding: 7px 11px;
+
     border: 0;
-
-    padding: 7px 10px;
-
     border-radius: 7px;
 
     background: var(--ink);
+    color: var(--white);
 
-    color: white;
+    font-size: 9px;
+    font-weight: 800;
 
-    font-size: 10px;
-    font-weight: 700;
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease;
 }
 
 .table-action:hover {
+    transform: translateY(-1px);
+
     background: var(--gold-dark);
 }
 
@@ -820,13 +1090,12 @@ input:focus {
    ========================================================= */
 
 .table-state {
-    min-height: 270px;
-
     display: flex;
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
+
+    min-height: 270px;
 
     padding: 40px;
 
@@ -838,38 +1107,47 @@ input:focus {
     text-align: center;
 }
 
+.table-state h3 {
+    margin: 12px 0 0;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 20px;
+    font-weight: 500;
+}
+
 .table-state p {
+    max-width: 440px;
+
     margin: 8px 0 0;
 
     color: var(--muted);
 
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.6;
 }
 
-.table-state h3 {
-    margin: 12px 0 0;
-
-    font-family: Georgia, "Times New Roman", serif;
-
-    font-size: 20px;
-    font-weight: 500;
+.table-state .secondary-btn {
+    margin-top: 18px;
 }
 
 .state-icon {
     display: grid;
     place-items: center;
 
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
 
     border-radius: 50%;
 
     background: var(--cream-dark);
-
     color: var(--gold-dark);
 
-    font-size: 20px;
-    font-weight: 800;
+    font-size: 19px;
+    font-weight: 850;
 }
 
 .error-state .state-icon {
@@ -877,23 +1155,24 @@ input:focus {
     color: var(--red);
 }
 
-.error-state .secondary-btn {
-    margin-top: 20px;
-}
+
+/* =========================================================
+   LOADER
+   ========================================================= */
 
 .loader {
-    width: 28px;
-    height: 28px;
+    width: 29px;
+    height: 29px;
 
     border: 3px solid var(--line);
     border-top-color: var(--gold-dark);
 
     border-radius: 50%;
 
-    animation: spin 0.8s linear infinite;
+    animation: storesense-spin 0.8s linear infinite;
 }
 
-@keyframes spin {
+@keyframes storesense-spin {
     to {
         transform: rotate(360deg);
     }
@@ -901,18 +1180,21 @@ input:focus {
 
 
 /* =========================================================
-   ATTENTION
+   ACTION CENTER
    ========================================================= */
 
 .attention-grid {
     display: grid;
 
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
 
     gap: 12px;
 }
 
 .attention-card {
+    min-width: 0;
+
     padding: 18px;
 
     border: 1px solid var(--line);
@@ -922,10 +1204,12 @@ input:focus {
 
     cursor: pointer;
 
+    box-shadow: var(--shadow-sm);
+
     transition:
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        box-shadow 0.2s ease;
+        transform 0.18s ease,
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
 }
 
 .attention-card:hover {
@@ -933,7 +1217,7 @@ input:focus {
 
     border-color: var(--gold);
 
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
 }
 
 .attention-top {
@@ -941,25 +1225,34 @@ input:focus {
     align-items: center;
     justify-content: space-between;
 
-    margin-bottom: 14px;
+    gap: 10px;
+
+    margin-bottom: 13px;
 }
 
 .attention-type {
+    overflow: hidden;
+
     color: var(--muted);
 
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 8px;
+    font-weight: 850;
 
     letter-spacing: 0.1em;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .priority {
+    flex-shrink: 0;
+
     padding: 5px 8px;
 
     border-radius: 20px;
 
-    font-size: 8px;
-    font-weight: 800;
+    font-size: 7px;
+    font-weight: 850;
 }
 
 .priority.high {
@@ -980,10 +1273,18 @@ input:focus {
 .attention-card h3 {
     margin: 0;
 
-    font-family: Georgia, "Times New Roman", serif;
+    overflow: hidden;
 
-    font-size: 19px;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 18px;
     font-weight: 500;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .attention-meta {
@@ -991,32 +1292,58 @@ input:focus {
 
     color: var(--ink-soft);
 
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .attention-value {
-    margin-top: 17px;
+    margin-top: 16px;
 
-    font-size: 13px;
-    font-weight: 750;
+    font-size: 11px;
+    font-weight: 800;
+
+    line-height: 1.55;
 }
 
 .attention-action {
-    margin-top: 12px;
+    margin-top: 11px;
 
     color: var(--gold-dark);
 
-    font-size: 10px;
-    font-weight: 800;
+    font-size: 9px;
+    font-weight: 850;
 }
 
 
 /* =========================================================
-   STOCK MOVEMENT
+   MOVEMENT / STOCK POSITION
    ========================================================= */
+
+.selected-product {
+    flex-shrink: 0;
+
+    max-width: 300px;
+
+    overflow: hidden;
+
+    padding: 7px 10px;
+
+    border: 1px solid var(--line-light);
+    border-radius: 7px;
+
+    background: var(--cream-dark);
+    color: var(--ink-soft);
+
+    font-size: 10px;
+    font-weight: 750;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .movement-card {
     min-height: 220px;
+
+    overflow: hidden;
 
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -1031,47 +1358,41 @@ input:focus {
 
     display: flex;
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
+
+    padding: 30px;
 
     text-align: center;
 }
 
 .movement-icon {
-    font-size: 30px;
-
     color: var(--gold-dark);
+
+    font-size: 29px;
 }
 
 .movement-empty h3 {
     margin: 10px 0 0;
 
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
-    font-size: 21px;
+    font-size: 20px;
     font-weight: 500;
 }
 
 .movement-empty p {
-    margin: 6px 0 0;
+    max-width: 500px;
+
+    margin: 7px 0 0;
 
     color: var(--muted);
 
-    font-size: 12px;
-}
-
-.selected-product {
-    padding: 7px 10px;
-
-    border-radius: 7px;
-
-    background: var(--cream-dark);
-
-    color: var(--ink-soft);
-
     font-size: 11px;
-    font-weight: 700;
+    line-height: 1.6;
 }
 
 .movement-content {
@@ -1080,19 +1401,23 @@ input:focus {
 
 .movement-stats {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
 
-    margin-bottom: 30px;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    margin-bottom: 25px;
 }
 
 .movement-stats > div {
-    padding-right: 20px;
+    min-width: 0;
+
+    padding: 0 20px;
 
     border-right: 1px solid var(--line-light);
 }
 
-.movement-stats > div:not(:first-child) {
-    padding-left: 20px;
+.movement-stats > div:first-child {
+    padding-left: 0;
 }
 
 .movement-stats > div:last-child {
@@ -1106,34 +1431,57 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 10px;
+    font-size: 9px;
 }
 
 .movement-stats strong {
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
-    font-size: 27px;
+    font-size: 26px;
     font-weight: 500;
 }
 
-.movement-bar-area {
+
+/* =========================================================
+   COVERAGE
+   ========================================================= */
+
+.movement-insight {
     padding-top: 18px;
 
     border-top: 1px solid var(--line-light);
 }
 
-.movement-bar-label {
+.movement-insight > div:first-child {
     display: flex;
+    align-items: center;
     justify-content: space-between;
 
-    margin-bottom: 8px;
+    gap: 15px;
 
+    margin-bottom: 8px;
+}
+
+.insight-label {
     color: var(--muted);
 
-    font-size: 10px;
+    font-size: 9px;
+    font-weight: 850;
+
+    letter-spacing: 0.1em;
+}
+
+#movementCoverageLabel {
+    color: var(--ink-soft);
+
+    font-size: 11px;
 }
 
 .movement-bar {
+    width: 100%;
     height: 9px;
 
     overflow: hidden;
@@ -1151,12 +1499,65 @@ input:focus {
 
     background: var(--gold);
 
-    transition: width 0.4s ease;
+    transition: width 0.45s ease;
+}
+
+#movementBarFill.risk {
+    background: var(--red);
+}
+
+#movementBarFill.low {
+    background: var(--yellow);
+}
+
+#movementBarFill.healthy {
+    background: var(--green);
+}
+
+#movementBarFill.slow {
+    background: var(--purple);
+}
+
+.movement-insight p {
+    margin: 9px 0 0;
+
+    color: var(--ink-soft);
+
+    font-size: 10px;
+    line-height: 1.6;
 }
 
 
 /* =========================================================
-   MODAL
+   TREND
+   ========================================================= */
+
+.movement-trend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 15px;
+
+    margin-top: 20px;
+    padding-top: 15px;
+
+    border-top: 1px solid var(--line-light);
+
+    color: var(--muted);
+
+    font-size: 10px;
+}
+
+.movement-trend strong {
+    color: var(--ink);
+
+    font-size: 10px;
+}
+
+
+/* =========================================================
+   MODAL OVERLAY
    ========================================================= */
 
 .modal-overlay {
@@ -1164,50 +1565,89 @@ input:focus {
 
     inset: 0;
 
-    z-index: 1000;
+    z-index: 9999;
 
     display: flex;
-
     align-items: center;
     justify-content: center;
 
     padding: 20px;
 
-    background: rgba(20, 17, 13, 0.55);
+    background: rgba(20, 17, 13, 0.58);
 
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(6px);
+
+    animation: modal-fade 0.16s ease;
 }
+
+@keyframes modal-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+
+/* =========================================================
+   MODALS
+   ========================================================= */
 
 .product-modal,
 .stock-modal {
     position: relative;
 
-    width: min(680px, 100%);
-
+    width: min(700px, 100%);
     max-height: calc(100vh - 40px);
 
     overflow-y: auto;
 
-    padding: 32px;
+    padding: 31px;
 
     border: 1px solid var(--line);
-
     border-radius: 18px;
 
     background: var(--paper);
 
-    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.2);
+    box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.22);
+
+    animation: modal-rise 0.18s ease;
 }
 
 .stock-modal {
     width: min(480px, 100%);
 }
 
+@keyframes modal-rise {
+    from {
+        transform: translateY(10px) scale(0.99);
+
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+
+        opacity: 1;
+    }
+}
+
+
+/* =========================================================
+   MODAL CLOSE
+   ========================================================= */
+
 .modal-close {
     position: absolute;
 
-    top: 16px;
-    right: 18px;
+    top: 15px;
+    right: 17px;
+
+    display: grid;
+    place-items: center;
 
     width: 34px;
     height: 34px;
@@ -1216,14 +1656,19 @@ input:focus {
     border-radius: 50%;
 
     background: var(--cream-dark);
-
     color: var(--ink);
 
-    font-size: 22px;
+    font-size: 21px;
     line-height: 1;
+
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease;
 }
 
 .modal-close:hover {
+    transform: rotate(4deg);
+
     background: var(--line);
 }
 
@@ -1231,12 +1676,17 @@ input:focus {
 .stock-modal h2 {
     margin: 0;
 
-    padding-right: 35px;
+    padding-right: 40px;
 
-    font-family: Georgia, "Times New Roman", serif;
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
 
-    font-size: 31px;
+    font-size: 30px;
     font-weight: 500;
+
+    letter-spacing: -0.02em;
 }
 
 .modal-product-meta {
@@ -1244,20 +1694,20 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 11px;
+    font-size: 10px;
 }
 
 .modal-status {
     display: inline-flex;
 
-    margin-top: 17px;
+    margin-top: 16px;
 
     padding: 7px 10px;
 
     border-radius: 20px;
 
-    font-size: 9px;
-    font-weight: 800;
+    font-size: 8px;
+    font-weight: 850;
 }
 
 .modal-status.healthy {
@@ -1280,17 +1730,26 @@ input:focus {
     color: var(--purple);
 }
 
+
+/* =========================================================
+   MODAL DETAILS
+   ========================================================= */
+
 .detail-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
 
-    margin-top: 24px;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    margin-top: 23px;
 
     border-top: 1px solid var(--line-light);
     border-bottom: 1px solid var(--line-light);
 }
 
 .detail-box {
+    min-width: 0;
+
     padding: 17px 13px;
 
     border-right: 1px solid var(--line-light);
@@ -1311,14 +1770,24 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 10px;
+    font-size: 9px;
 }
 
 .detail-box strong {
-    font-family: Georgia, "Times New Roman", serif;
+    display: block;
 
-    font-size: 25px;
+    overflow: hidden;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 24px;
     font-weight: 500;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .detail-box small {
@@ -1328,18 +1797,28 @@ input:focus {
 
     color: var(--muted);
 
-    font-size: 9px;
+    font-size: 8px;
 }
+
+
+/* =========================================================
+   RECOMMENDATION / EVIDENCE
+   ========================================================= */
 
 .recommendation-box,
 .evidence-box {
-    margin-top: 20px;
+    margin-top: 19px;
 
-    padding: 17px;
+    padding: 16px;
 
+    border: 1px solid var(--line-light);
     border-radius: 10px;
 
     background: var(--cream-dark);
+}
+
+.evidence-box {
+    background: #faf8f2;
 }
 
 .recommendation-title,
@@ -1348,9 +1827,10 @@ input:focus {
 
     color: var(--gold-dark);
 
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.1em;
+    font-size: 8px;
+    font-weight: 850;
+
+    letter-spacing: 0.11em;
 }
 
 .recommendation-box p {
@@ -1358,33 +1838,35 @@ input:focus {
 
     color: var(--ink);
 
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.65;
-}
-
-.evidence-box {
-    background: #faf8f2;
 }
 
 #modalEvidence {
     color: var(--ink-soft);
 
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.7;
 }
 
 #modalEvidence ul {
     margin: 0;
+
     padding-left: 17px;
+}
+
+#modalEvidence li + li {
+    margin-top: 4px;
 }
 
 .modal-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
 
     gap: 9px;
 
-    margin-top: 24px;
+    margin-top: 22px;
 }
 
 
@@ -1393,81 +1875,159 @@ input:focus {
    ========================================================= */
 
 .modal-description {
-    margin: 9px 0 24px;
+    margin: 9px 0 23px;
 
     color: var(--ink-soft);
 
-    font-size: 12px;
-    line-height: 1.6;
+    font-size: 11px;
+    line-height: 1.65;
 }
 
 .stock-modal label {
     display: block;
 
-    margin-bottom: 16px;
+    margin-bottom: 15px;
 
     color: var(--ink-soft);
 
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 750;
 }
 
 .stock-modal select,
 .stock-modal input {
     display: block;
 
+    width: 100%;
+    height: 42px;
+
     margin-top: 7px;
+
+    padding: 0 11px;
+
+    border: 1px solid var(--line);
+    border-radius: 8px;
+
+    outline: none;
+
+    background: var(--white);
+    color: var(--ink);
+
+    font-size: 12px;
+
+    transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+.stock-modal select:focus,
+.stock-modal input:focus {
+    border-color: var(--gold);
+
+    box-shadow:
+        0 0 0 3px rgba(164, 123, 44, 0.1);
 }
 
 .form-error {
+    margin-top: 5px;
+
     padding: 10px 12px;
 
     border-radius: 8px;
 
     background: var(--red-bg);
-
     color: var(--red);
 
-    font-size: 11px;
+    font-size: 10px;
+    line-height: 1.5;
 }
 
 
 /* =========================================================
-   RESPONSIVE
+   LARGE DESKTOP
    ========================================================= */
 
-@media (max-width: 1200px) {
+@media (min-width: 1400px) {
 
     .main-content {
-        padding: 35px 30px 60px;
+        padding-left: 52px;
+        padding-right: 52px;
     }
 
-    .status-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .store-toolbar {
-        grid-template-columns: 180px 1fr;
-    }
-
-    .filter-group {
-        grid-column: 1 / -1;
-    }
-
-    .filter-group select {
-        flex: 1;
-    }
-
-    .attention-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 
-@media (max-width: 850px) {
+/* =========================================================
+   LARGE TABLET / SMALL DESKTOP
+   ========================================================= */
+
+@media (max-width: 1250px) {
+
+    .inventory-controls {
+        grid-template-columns:
+            180px
+            minmax(220px, 1fr)
+            1fr;
+    }
+
+    .filter-control {
+        grid-column: 1 / -1;
+    }
+
+    .clear-filter-btn {
+        position: absolute;
+
+        width: 1px;
+        height: 1px;
+
+        overflow: hidden;
+
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .inventory-summary {
+        grid-template-columns:
+            repeat(3, 1fr);
+    }
+
+    .summary-metric:nth-child(3) {
+        border-right: 0;
+    }
+
+    .summary-metric:nth-child(n + 4) {
+        border-top: 1px solid var(--line-light);
+    }
+
+    .status-grid {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+    .attention-grid {
+        grid-template-columns:
+            repeat(2, 1fr);
+    }
+
+}
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1000px) {
+
+    .main-content {
+        padding:
+            30px
+            24px
+            60px;
+    }
 
     .topbar {
         flex-direction: column;
+
+        gap: 20px;
     }
 
     .topbar-actions {
@@ -1478,154 +2038,421 @@ input:focus {
         flex: 1;
     }
 
-    .summary-metrics {
-        grid-template-columns: repeat(2, 1fr);
+    .inventory-controls {
+        grid-template-columns:
+            1fr
+            1fr;
     }
 
-    .summary-metric {
-        border-bottom: 1px solid var(--line-light);
+    .search-control {
+        grid-column: 1 / -1;
     }
 
-    .summary-metric:nth-child(2) {
-        border-right: 0;
+    .store-selector {
+        grid-column: 1;
+    }
+
+    .filter-control {
+        grid-column: 1 / -1;
+    }
+
+    .clear-filter-btn {
+        display: none;
+    }
+
+    .section-heading-row,
+    .section-header {
+        align-items: flex-start;
+    }
+
+    .health-caption {
+        max-width: 300px;
+
+        text-align: right;
     }
 
     .movement-stats {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
+        grid-template-columns:
+            repeat(2, 1fr);
+
+        gap: 22px;
     }
 
     .movement-stats > div {
+        padding: 0;
+
         border-right: 0;
     }
 
-    .movement-stats > div:not(:first-child) {
-        padding-left: 0;
+    .movement-stats > div:nth-child(3),
+    .movement-stats > div:nth-child(4) {
+        padding-top: 18px;
+
+        border-top: 1px solid var(--line-light);
     }
+
 }
 
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media (max-width: 700px) {
 
     .main-content {
-        padding: 25px 17px 50px;
+        width: 100%;
+
+        padding:
+            24px
+            15px
+            50px;
+    }
+
+    .topbar {
+        margin-bottom: 25px;
     }
 
     .topbar h1 {
         font-size: 32px;
     }
 
-    .store-toolbar {
+    .page-description {
+        font-size: 12px;
+    }
+
+    .topbar-actions {
+        flex-direction: column;
+
+        width: 100%;
+    }
+
+    .topbar-actions button {
+        width: 100%;
+    }
+
+
+    /* -----------------------------------------------------
+       CONTROLS
+       ----------------------------------------------------- */
+
+    .inventory-controls {
+        grid-template-columns: 1fr;
+
+        gap: 9px;
+
+        padding: 12px;
+    }
+
+    .search-control,
+    .store-selector,
+    .filter-control {
+        grid-column: auto;
+    }
+
+    .filter-control {
         grid-template-columns: 1fr;
     }
 
-    .filter-group {
-        display: grid;
-        grid-template-columns: 1fr;
+
+    /* -----------------------------------------------------
+       HEADINGS
+       ----------------------------------------------------- */
+
+    .section-heading-row,
+    .section-header {
+        flex-direction: column;
+
+        gap: 10px;
     }
+
+    .health-caption {
+        max-width: none;
+
+        text-align: left;
+    }
+
+    .view-all-link {
+        align-self: flex-start;
+    }
+
+
+    /* -----------------------------------------------------
+       HEALTH
+       ----------------------------------------------------- */
 
     .status-grid {
         grid-template-columns: 1fr;
     }
 
     .status-card {
-        min-height: 145px;
+        min-height: 135px;
     }
+
+
+    /* -----------------------------------------------------
+       SUMMARY
+       ----------------------------------------------------- */
 
     .inventory-summary {
-        padding: 18px;
-    }
-
-    .summary-heading {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .summary-metrics {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns:
+            1fr 1fr;
     }
 
     .summary-metric {
-        padding: 15px 10px;
+        border-right: 0;
+
+        border-bottom: 1px solid var(--line-light);
     }
 
-    .summary-metric:first-child {
-        padding-left: 0;
+    .summary-metric:nth-child(odd) {
+        border-right: 1px solid var(--line-light);
+    }
+
+    .summary-metric:nth-child(5) {
+        grid-column: 1 / -1;
+
+        border-right: 0;
+        border-bottom: 0;
     }
 
     .summary-metric strong {
         font-size: 23px;
     }
 
+
+    /* -----------------------------------------------------
+       ATTENTION
+       ----------------------------------------------------- */
+
     .attention-grid {
         grid-template-columns: 1fr;
     }
 
-    .section-header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
+
+    /* -----------------------------------------------------
+       MOVEMENT
+       ----------------------------------------------------- */
 
     .selected-product {
+        max-width: 100%;
+
         align-self: flex-start;
     }
 
-    .detail-grid {
-        grid-template-columns: 1fr 1fr;
+    .movement-content {
+        padding: 18px;
     }
 
-    .detail-box:nth-child(2) {
-        border-right: 0;
-    }
 
-    .detail-box:nth-child(3),
-    .detail-box:nth-child(4) {
-        border-top: 1px solid var(--line-light);
+    /* -----------------------------------------------------
+       MODALS
+       ----------------------------------------------------- */
+
+    .modal-overlay {
+        align-items: flex-end;
+
+        padding: 10px;
     }
 
     .product-modal,
     .stock-modal {
-        padding: 24px;
+        width: 100%;
+
+        max-height:
+            calc(100vh - 20px);
+
+        padding: 23px;
+
+        border-radius: 16px;
     }
+
+    .product-modal h2,
+    .stock-modal h2 {
+        font-size: 26px;
+    }
+
+    .modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .modal-actions button {
+        width: 100%;
+    }
+
 }
 
 
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
 @media (max-width: 480px) {
 
-    .topbar-actions {
-        flex-direction: column;
+    .main-content {
+        padding:
+            20px
+            12px
+            42px;
     }
 
-    .summary-metrics {
+    .topbar h1 {
+        font-size: 29px;
+    }
+
+    .section-heading-row h2,
+    .section-header h2 {
+        font-size: 22px;
+    }
+
+
+    /* -----------------------------------------------------
+       KPI
+       ----------------------------------------------------- */
+
+    .inventory-summary {
         grid-template-columns: 1fr;
     }
 
     .summary-metric,
-    .summary-metric:first-child {
-        padding-left: 0;
-        padding-right: 0;
+    .summary-metric:nth-child(odd),
+    .summary-metric:nth-child(5) {
+        grid-column: auto;
 
         border-right: 0;
     }
+
+    .summary-metric:last-child {
+        border-bottom: 0;
+    }
+
+
+    /* -----------------------------------------------------
+       MOVEMENT
+       ----------------------------------------------------- */
 
     .movement-stats {
         grid-template-columns: 1fr;
+
+        gap: 0;
     }
+
+    .movement-stats > div,
+    .movement-stats > div:nth-child(3),
+    .movement-stats > div:nth-child(4) {
+        padding:
+            14px
+            0;
+
+        border-top: 1px solid var(--line-light);
+    }
+
+    .movement-stats > div:first-child {
+        padding-top: 0;
+
+        border-top: 0;
+    }
+
+
+    /* -----------------------------------------------------
+       PRODUCT MODAL
+       ----------------------------------------------------- */
 
     .detail-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns:
+            1fr 1fr;
     }
 
-    .detail-box,
-    .detail-box:first-child {
-        padding-left: 0;
+    .detail-box {
+        padding:
+            14px
+            10px;
 
         border-right: 0;
-        border-bottom: 1px solid var(--line-light);
     }
 
-    .detail-box:last-child {
-        border-bottom: 0;
+    .detail-box:nth-child(odd) {
+        border-right:
+            1px solid var(--line-light);
     }
+
+    .detail-box:nth-child(n + 3) {
+        border-top:
+            1px solid var(--line-light);
+    }
+
+    .detail-box:first-child {
+        padding-left: 10px;
+    }
+
+
+    /* -----------------------------------------------------
+       STOCK MODAL
+       ----------------------------------------------------- */
+
+    .product-modal,
+    .stock-modal {
+        padding: 20px;
+    }
+
+}
+
+
+/* =========================================================
+   VERY SMALL DEVICES
+   ========================================================= */
+
+@media (max-width: 360px) {
+
+    .main-content {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .status-card {
+        padding: 16px;
+    }
+
+    .status-value {
+        font-size: 30px;
+    }
+
+    .summary-metric {
+        padding: 16px;
+    }
+
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--gold);
+
+    outline-offset: 2px;
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+
+        transition-duration: 0.01ms !important;
+    }
+
 }

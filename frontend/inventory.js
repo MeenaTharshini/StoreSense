@@ -1,14 +1,24 @@
 /* ============================================================
-   StoreSense — Inventory Control Center
+   StoreSense
+   Inventory Control Center
    frontend/inventory.js
+
+   Responsibilities:
+   - Load inventory, stores, products and alerts
+   - Calculate inventory health
+   - Filter / search / sort
+   - Show evidence
+   - Update stock
+   - Export visible inventory
+   - Never fabricate historical movement data
    ============================================================ */
 
 (() => {
     "use strict";
 
-    // ---------------------------------------------------------
-    // State
-    // ---------------------------------------------------------
+    /* =========================================================
+       STATE
+       ========================================================= */
 
     const state = {
         stores: [],
@@ -18,35 +28,59 @@
         filteredInventory: [],
         selectedItem: null,
         currentStatus: "all",
-        currentStore: "all"
+        loading: false,
+        savingStock: false
     };
 
-    // ---------------------------------------------------------
-    // DOM helpers
-    // ---------------------------------------------------------
+
+    /* =========================================================
+       DOM
+       ========================================================= */
 
     const $ = (id) => document.getElementById(id);
 
-    const elements = {
+    const el = {
+        /* Filters */
         storeFilter: $("storeFilter"),
         searchInput: $("searchInput"),
         categoryFilter: $("categoryFilter"),
         statusFilter: $("statusFilter"),
         sortFilter: $("sortFilter"),
+        clearFilterBtn: $("clearFilterBtn"),
+        emptyClearBtn: $("emptyClearBtn"),
 
+        /* Actions */
+        retryBtn: $("retryBtn"),
+        refreshBtn: $("refreshBtn"),
+        addStockBtn: $("addStockBtn"),
+        exportBtn: $("exportBtn"),
+
+        /* Status counts */
+        healthyCount: $("healthyCount"),
+        lowCount: $("lowCount"),
+        stockoutCount: $("stockoutCount"),
+        slowCount: $("slowCount"),
+
+        /* Summary */
         totalStock: $("totalStock"),
         totalProducts: $("totalProducts"),
         immediateRisk: $("immediateRisk"),
         excessRisk: $("excessRisk"),
         recordCount: $("recordCount"),
+        registerState: $("registerState"),
 
-        inventoryTableBody: $("inventoryTableBody"),
-        inventoryLoading: $("inventoryLoading"),
-        inventoryError: $("inventoryError"),
-        inventoryEmpty: $("inventoryEmpty"),
+        /* Main states */
+        loadingState: $("loadingState"),
+        errorState: $("errorState"),
+        errorMessage: $("errorMessage"),
+        emptyState: $("emptyState"),
+        tableWrapper: $("tableWrapper"),
+        tableBody: $("inventoryTableBody"),
 
+        /* Attention */
         attentionGrid: $("attentionGrid"),
 
+        /* Movement */
         selectedProduct: $("selectedProduct"),
         movementEmpty: $("movementEmpty"),
         movementContent: $("movementContent"),
@@ -56,8 +90,14 @@
         movementDays: $("movementDays"),
         movementPercent: $("movementPercent"),
         movementBarFill: $("movementBarFill"),
+        movementCoverageLabel: $("movementCoverageLabel"),
+        movementInsightText: $("movementInsightText"),
 
+        /* Product modal */
         productModal: $("productModal"),
+        closeProductModal: $("closeProductModal"),
+        modalCloseBtn: $("modalCloseBtn"),
+        modalActionBtn: $("modalActionBtn"),
         modalProductName: $("modalProductName"),
         modalProductMeta: $("modalProductMeta"),
         modalStatus: $("modalStatus"),
@@ -67,10 +107,12 @@
         modal30DaySales: $("modal30DaySales"),
         modalRecommendation: $("modalRecommendation"),
         modalEvidence: $("modalEvidence"),
-        modalCloseBtn: $("modalCloseBtn"),
-        modalActionBtn: $("modalActionBtn"),
 
+        /* Stock modal */
         stockModal: $("stockModal"),
+        closeStockModal: $("closeStockModal"),
+        cancelStockBtn: $("cancelStockBtn"),
+        stockForm: $("stockForm"),
         stockStore: $("stockStore"),
         stockProduct: $("stockProduct"),
         stockQuantity: $("stockQuantity"),
@@ -78,40 +120,36 @@
         stockFormError: $("stockFormError"),
         saveStockBtn: $("saveStockBtn"),
 
-        refreshBtn: $("refreshBtn"),
-        addStockBtn: $("addStockBtn"),
-
+        /* Status buttons */
         statusButtons: document.querySelectorAll("[data-status]")
     };
 
-    // ---------------------------------------------------------
-    // Utility functions
-    // ---------------------------------------------------------
 
-    function number(value, fallback = 0) {
+    /* =========================================================
+       BASIC UTILITIES
+       ========================================================= */
+
+    function num(value, fallback = 0) {
         const n = Number(value);
         return Number.isFinite(n) ? n : fallback;
     }
 
-    function formatNumber(value) {
-        return number(value).toLocaleString("en-IN", {
-            maximumFractionDigits: 1
-        });
+
+    function integer(value) {
+        return Math.round(num(value)).toLocaleString("en-IN");
     }
 
-    function formatInteger(value) {
-        return Math.round(number(value)).toLocaleString("en-IN");
+
+    function decimal(value, digits = 1) {
+        return num(value).toLocaleString(
+            "en-IN",
+            {
+                minimumFractionDigits: digits,
+                maximumFractionDigits: digits
+            }
+        );
     }
 
-    function formatDays(value) {
-        const n = number(value);
-
-        if (!Number.isFinite(n) || n <= 0) {
-            return "—";
-        }
-
-        return `${n.toFixed(1)} days`;
-    }
 
     function escapeHTML(value) {
         return String(value ?? "")
@@ -122,25 +160,27 @@
             .replace(/'/g, "&#039;");
     }
 
-    function show(element) {
-        if (element) {
-            element.style.display = "";
+
+    function show(node) {
+        if (!node) return;
+        node.classList.remove("hidden");
+    }
+
+
+    function hide(node) {
+        if (!node) return;
+        node.classList.add("hidden");
+    }
+
+
+    function text(node, value) {
+        if (node) {
+            node.textContent = value ?? "";
         }
     }
 
-    function hide(element) {
-        if (element) {
-            element.style.display = "none";
-        }
-    }
 
-    function setText(element, value) {
-        if (element) {
-            element.textContent = value ?? "";
-        }
-    }
-
-    function getArray(payload, keys = []) {
+    function arrayFrom(payload, keys = []) {
         if (Array.isArray(payload)) {
             return payload;
         }
@@ -154,14 +194,27 @@
         return [];
     }
 
-    async function fetchJSON(url, options = {}) {
-        const response = await fetch(url, {
-            ...options,
-            headers: {
-                "Content-Type": "application/json",
-                ...(options.headers || {})
+
+    function safeLower(value) {
+        return String(value ?? "").trim().toLowerCase();
+    }
+
+
+    /* =========================================================
+       API
+       ========================================================= */
+
+    async function request(url, options = {}) {
+        const response = await fetch(
+            url,
+            {
+                ...options,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(options.headers || {})
+                }
             }
-        });
+        );
 
         let payload = {};
 
@@ -182,11 +235,12 @@
         return payload;
     }
 
-    // ---------------------------------------------------------
-    // Data normalization
-    // ---------------------------------------------------------
 
-    function productId(item) {
+    /* =========================================================
+       IDENTIFIERS
+       ========================================================= */
+
+    function getProductId(item) {
         return String(
             item?.product_id ??
             item?.productId ??
@@ -195,7 +249,8 @@
         );
     }
 
-    function storeId(item) {
+
+    function getStoreId(item) {
         return String(
             item?.store_id ??
             item?.storeId ??
@@ -204,140 +259,379 @@
         );
     }
 
-    function normalizeInventory(item) {
-        const pid = productId(item);
-        const sid = storeId(item);
 
-        const product =
-            state.products.find(
-                p => productId(p) === pid
-            ) || {};
+    function getProductName(product) {
+        return (
+            product?.product_name ??
+            product?.productName ??
+            product?.name ??
+            getProductId(product)
+        );
+    }
 
-        const store =
-            state.stores.find(
-                s => storeId(s) === sid
-            ) || {};
+
+    function getStoreName(store) {
+        return (
+            store?.store_name ??
+            store?.storeName ??
+            store?.name ??
+            getStoreId(store)
+        );
+    }
+
+
+    /* =========================================================
+       LOOKUPS
+       ========================================================= */
+
+    function findProduct(productId) {
+        return state.products.find(
+            product =>
+                getProductId(product) === String(productId)
+        );
+    }
+
+
+    function findStore(storeId) {
+        return state.stores.find(
+            store =>
+                getStoreId(store) === String(storeId)
+        );
+    }
+
+
+    function findInventoryItem(productId, storeId) {
+        return state.inventory.find(
+            item =>
+                String(item.product_id) === String(productId) &&
+                String(item.store_id) === String(storeId)
+        );
+    }
+
+
+    /* =========================================================
+       NORMALIZE INVENTORY
+       ========================================================= */
+
+    function normalizeInventory(raw) {
+        const productId = getProductId(raw);
+        const storeId = getStoreId(raw);
+
+        const product = findProduct(productId) || {};
+        const store = findStore(storeId) || {};
 
         return {
-            ...item,
+            ...raw,
 
-            product_id: pid,
-            store_id: sid,
+            product_id: productId,
+            store_id: storeId,
 
             product_name:
-                item.product_name ??
-                item.productName ??
+                raw.product_name ??
+                raw.productName ??
                 product.product_name ??
                 product.name ??
-                `Product ${pid}`,
+                `Product ${productId}`,
 
             category:
-                item.category ??
+                raw.category ??
                 product.category ??
                 "Uncategorized",
 
             store_name:
-                item.store_name ??
-                item.storeName ??
+                raw.store_name ??
+                raw.storeName ??
                 store.store_name ??
                 store.name ??
-                `Store ${sid}`,
+                `Store ${storeId}`,
 
-            stock: number(
-                item.stock ??
-                item.quantity ??
-                item.current_stock ??
+            stock: num(
+                raw.stock ??
+                raw.quantity ??
+                raw.current_stock ??
                 0
             ),
 
-            price: number(
-                item.price ??
+            price: num(
+                raw.price ??
                 product.price ??
                 0
             )
         };
     }
 
-    function findAttention(item) {
-        const pid = productId(item);
-        const sid = storeId(item);
 
-        return state.attention.find(alert => {
-            const alertPid = productId(alert);
-            const alertSid = storeId(alert);
+    /* =========================================================
+       ALERT HELPERS
+       ========================================================= */
 
-            return (
-                alertPid === pid &&
-                (!alertSid || !sid || alertSid === sid)
-            );
-        });
-    }
-
-    // ---------------------------------------------------------
-    // Inventory status calculation
-    // ---------------------------------------------------------
-
-    function getInventoryStatus(item) {
-        const stock = number(item.stock);
-        const alert = findAttention(item);
-
-        const alertType = String(
+    function alertType(alert) {
+        return safeLower(
             alert?.type ??
             alert?.alert_type ??
             alert?.category ??
             ""
-        ).toLowerCase();
+        );
+    }
+
+
+    function isInventoryAlert(alert) {
+        const type = alertType(alert);
+
+        return (
+            type.includes("stockout") ||
+            type.includes("stock-out") ||
+            type.includes("stock out") ||
+            type.includes("low stock") ||
+            type === "low" ||
+            type.includes("stock risk") ||
+            type.includes("slow") ||
+            type.includes("non-moving") ||
+            type.includes("nonmoving")
+        );
+    }
+
+
+    function attentionFor(item) {
+        const pid = String(item.product_id);
+        const sid = String(item.store_id);
+
+        /*
+         * Prefer store-specific alerts.
+         */
+        const storeSpecific = state.attention.find(alert => {
+            const alertPid = getProductId(alert);
+            const alertSid = getStoreId(alert);
+
+            if (alertPid !== pid) {
+                return false;
+            }
+
+            if (!alertSid || alertSid !== sid) {
+                return false;
+            }
+
+            return true;
+        });
+
+        if (storeSpecific) {
+            return storeSpecific;
+        }
+
+        /*
+         * Then allow product-level alerts.
+         */
+        return state.attention.find(alert => {
+            const alertPid = getProductId(alert);
+            const alertSid = getStoreId(alert);
+
+            return (
+                alertPid === pid &&
+                !alertSid
+            );
+        });
+    }
+
+
+    function inventoryAlertFor(item) {
+        const pid = String(item.product_id);
+        const sid = String(item.store_id);
+
+        const storeSpecific = state.attention.find(alert => {
+            const alertPid = getProductId(alert);
+            const alertSid = getStoreId(alert);
+
+            return (
+                alertPid === pid &&
+                alertSid === sid &&
+                isInventoryAlert(alert)
+            );
+        });
+
+        if (storeSpecific) {
+            return storeSpecific;
+        }
+
+        return state.attention.find(alert => {
+            const alertPid = getProductId(alert);
+            const alertSid = getStoreId(alert);
+
+            return (
+                alertPid === pid &&
+                !alertSid &&
+                isInventoryAlert(alert)
+            );
+        });
+    }
+
+
+    /* =========================================================
+       SALES SIGNALS
+       ========================================================= */
+
+    function sales30(item) {
+        const alert = attentionFor(item);
+
+        const candidates = [
+            item?.units_30d,
+            item?.sales_30d,
+            item?.units_sold_30d,
+            alert?.units_30d,
+            alert?.sales_30d,
+            alert?.units_sold_30d
+        ];
+
+        for (const value of candidates) {
+            if (
+                value !== undefined &&
+                value !== null &&
+                Number.isFinite(Number(value))
+            ) {
+                return Number(value);
+            }
+        }
+
+        return 0;
+    }
+
+
+    function dailySales(item) {
+        const explicit =
+            item?.avg_daily_sales ??
+            item?.average_daily_sales ??
+            item?.daily_sales;
 
         if (
-            alertType.includes("stockout") ||
-            alertType.includes("stock-out") ||
-            alertType.includes("stock out")
+            explicit !== undefined &&
+            explicit !== null &&
+            num(explicit) > 0
+        ) {
+            return num(explicit);
+        }
+
+        const units = sales30(item);
+
+        return units > 0
+            ? units / 30
+            : 0;
+    }
+
+
+    function daysLeft(item) {
+        const explicit =
+            item?.days_to_stockout ??
+            item?.days_left ??
+            item?.days_remaining;
+
+        if (
+            explicit !== undefined &&
+            explicit !== null &&
+            Number.isFinite(Number(explicit))
+        ) {
+            return Math.max(
+                0,
+                Number(explicit)
+            );
+        }
+
+        const daily = dailySales(item);
+
+        if (daily <= 0) {
+            return null;
+        }
+
+        return num(item.stock) / daily;
+    }
+
+
+    /* =========================================================
+       INVENTORY STATUS
+       ========================================================= */
+
+    function statusFor(item) {
+        const stock = num(item.stock);
+        const alert = inventoryAlertFor(item);
+        const type = alertType(alert);
+
+        /*
+         * Backend inventory signal first.
+         */
+
+        if (
+            type.includes("stockout") ||
+            type.includes("stock-out") ||
+            type.includes("stock out")
         ) {
             return "stockout";
         }
 
+
         if (
-            alertType.includes("slow") ||
-            alertType.includes("non-moving") ||
-            alertType.includes("nonmoving")
+            type.includes("slow") ||
+            type.includes("non-moving") ||
+            type.includes("nonmoving")
         ) {
             return "slow";
         }
 
+
         if (
-            alertType.includes("drop") ||
-            alertType.includes("low")
+            type.includes("low stock") ||
+            type === "low" ||
+            type.includes("stock risk")
         ) {
             return "low";
         }
 
-        const days = getDaysLeft(item);
+
+        /*
+         * Direct stock evidence.
+         */
 
         if (stock <= 0) {
             return "stockout";
         }
 
-        if (days !== null && days <= 3) {
+
+        const days = daysLeft(item);
+
+        if (
+            days !== null &&
+            days <= 3
+        ) {
             return "stockout";
         }
 
-        if (days !== null && days <= 7) {
+
+        if (
+            days !== null &&
+            days <= 7
+        ) {
             return "low";
         }
 
-        const units30 = get30DaySales(item);
+
+        /*
+         * Slow-moving requires BOTH:
+         * - significant stock
+         * - very low recent sales
+         */
+
+        const recentSales = sales30(item);
 
         if (
             stock >= 50 &&
-            units30 <= 5
+            recentSales <= 5
         ) {
             return "slow";
         }
 
+
         return "healthy";
     }
 
-    function getStatusLabel(status) {
+
+    function statusLabel(status) {
         const labels = {
             healthy: "Healthy",
             low: "Low Stock",
@@ -348,303 +642,282 @@
         return labels[status] || "Healthy";
     }
 
-    function getStatusClass(status) {
-        return `status-${status}`;
+
+    function statusRank(status) {
+        return {
+            stockout: 4,
+            low: 3,
+            slow: 2,
+            healthy: 1
+        }[status] || 0;
     }
 
-    // ---------------------------------------------------------
-    // Evidence helpers
-    // ---------------------------------------------------------
 
-    function get30DaySales(item) {
-        const alert = findAttention(item);
-
-        if (alert) {
-            return number(
-                alert.units_30d ??
-                alert.sales_30d ??
-                alert.units_sold_30d ??
-                0
-            );
-        }
-
-        return number(
-            item.units_30d ??
-            item.sales_30d ??
-            item.units_sold_30d ??
-            0
-        );
-    }
-
-    function getDailySales(item) {
-        const explicit = number(
-            item.avg_daily_sales ??
-            item.average_daily_sales ??
-            item.daily_sales ??
-            0
-        );
-
-        if (explicit > 0) {
-            return explicit;
-        }
-
-        const units30 = get30DaySales(item);
-
-        return units30 > 0 ? units30 / 30 : 0;
-    }
-
-    function getDaysLeft(item) {
-        const explicit =
-            item.days_to_stockout ??
-            item.days_left ??
-            item.days_remaining;
-
-        if (
-            explicit !== undefined &&
-            explicit !== null &&
-            Number.isFinite(Number(explicit))
-        ) {
-            return Math.max(0, Number(explicit));
-        }
-
-        const dailySales = getDailySales(item);
-
-        if (dailySales <= 0) {
-            return null;
-        }
-
-        return number(item.stock) / dailySales;
-    }
-
-    function getPriority(item) {
-        const alert = findAttention(item);
-
-        return String(
-            alert?.priority ??
-            alert?.severity ??
-            ""
-        ).toLowerCase();
-    }
-
-    // ---------------------------------------------------------
-    // Load data
-    // ---------------------------------------------------------
+    /* =========================================================
+       LOAD STORES
+       ========================================================= */
 
     async function loadStores() {
-        const payload = await fetchJSON("/api/stores");
 
-        state.stores = getArray(payload, [
-            "stores",
-            "items",
-            "data"
-        ]);
+    const payload =
+        await request(
+            "/api/stores"
+        );
 
-        populateStoreFilters();
-        populateStockStores();
-    }
+    state.stores =
+        arrayFrom(
+            payload,
+            [
+                "stores",
+                "items",
+                "data"
+            ]
+        );
+
+    // Main inventory filter
+    populateStores();
+
+    // Add Stock modal store dropdown
+    populateStockStores();
+}
+
+
+    /* =========================================================
+       LOAD PRODUCTS
+       ========================================================= */
 
     async function loadProducts() {
-        const payload = await fetchJSON("/api/products");
+        const payload = await request("/api/products");
 
-        state.products = getArray(payload, [
-            "products",
-            "items",
-            "data"
-        ]);
+        state.products = arrayFrom(
+            payload,
+            [
+                "products",
+                "items",
+                "data"
+            ]
+        );
 
-        populateCategoryFilter();
+        populateCategories();
         populateStockProducts();
     }
 
+
+    /* =========================================================
+       LOAD INVENTORY
+       ========================================================= */
+
     async function loadInventory() {
-        const selectedStore =
-            elements.storeFilter?.value || "all";
+        const store =
+            el.storeFilter?.value ||
+            "all";
 
         let url = "/api/inventory";
 
-        if (
-            selectedStore &&
-            selectedStore !== "all"
-        ) {
-            url += `?store_id=${encodeURIComponent(selectedStore)}`;
+        if (store !== "all") {
+            url +=
+                `?store_id=${encodeURIComponent(store)}`;
         }
 
-        const payload = await fetchJSON(url);
+        const payload = await request(url);
 
-        const rawInventory = getArray(payload, [
-            "items",
-            "inventory",
-            "data"
-        ]);
-
-        state.inventory = rawInventory.map(normalizeInventory);
+        state.inventory = arrayFrom(
+            payload,
+            [
+                "items",
+                "inventory",
+                "data"
+            ]
+        ).map(normalizeInventory);
     }
+
+
+    /* =========================================================
+       LOAD ATTENTION
+       ========================================================= */
 
     async function loadAttention() {
-        const payload = await fetchJSON("/api/attention");
+        const payload =
+            await request("/api/attention");
 
-        state.attention = getArray(payload, [
-            "items",
-            "attention",
-            "alerts",
-            "data"
-        ]);
+        state.attention = arrayFrom(
+            payload,
+            [
+                "items",
+                "attention",
+                "alerts",
+                "data"
+            ]
+        );
     }
 
+
+    /* =========================================================
+       LOAD ALL
+       ========================================================= */
+
     async function loadAll() {
-        setLoading(true);
-        hide(elements.inventoryError);
+        if (state.loading) {
+            return;
+        }
+
+        state.loading = true;
+
+        setLoadingState(true);
+        hide(el.errorState);
 
         try {
+            /*
+             * Reference data first.
+             */
             await Promise.all([
                 loadStores(),
                 loadProducts()
             ]);
 
+            /*
+             * Inventory + attention after
+             * reference data is available.
+             */
             await Promise.all([
                 loadInventory(),
                 loadAttention()
             ]);
 
-            // Re-normalize after all reference data exists.
-            state.inventory = state.inventory.map(
-                normalizeInventory
-            );
+            state.inventory =
+                state.inventory.map(
+                    normalizeInventory
+                );
 
-            renderEverything();
+            render();
 
         } catch (error) {
-            console.error("Inventory load error:", error);
-
-            setText(
-                elements.inventoryError,
-                `Unable to load inventory: ${error.message}`
+            console.error(
+                "Inventory load failed:",
+                error
             );
 
-            show(elements.inventoryError);
+            show(el.errorState);
+
+            text(
+                el.errorMessage,
+                error.message ||
+                "Unable to load inventory."
+            );
+
+            hide(el.tableWrapper);
+            hide(el.emptyState);
 
         } finally {
-            setLoading(false);
+            state.loading = false;
+            setLoadingState(false);
         }
     }
 
-    // ---------------------------------------------------------
-    // Loading states
-    // ---------------------------------------------------------
 
-    function setLoading(isLoading) {
-        if (isLoading) {
-            show(elements.inventoryLoading);
-            hide(elements.inventoryEmpty);
+    /* =========================================================
+       LOADING UI
+       ========================================================= */
+
+    function setLoadingState(loading) {
+        if (loading) {
+            show(el.loadingState);
+            hide(el.tableWrapper);
+            hide(el.emptyState);
+
+            text(
+                el.registerState,
+                "Synchronising..."
+            );
+
+            if (el.refreshBtn) {
+                el.refreshBtn.disabled = true;
+            }
+
         } else {
-            hide(elements.inventoryLoading);
+            hide(el.loadingState);
+
+            text(
+                el.registerState,
+                `${state.inventory.length} records`
+            );
+
+            if (el.refreshBtn) {
+                el.refreshBtn.disabled = false;
+            }
         }
     }
 
-    // ---------------------------------------------------------
-    // Filter controls
-    // ---------------------------------------------------------
 
-    function populateStoreFilters() {
-        if (!elements.storeFilter) return;
+    /* =========================================================
+       FILTER OPTIONS
+       ========================================================= */
 
-        const current = elements.storeFilter.value;
+    function populateStores() {
+        if (!el.storeFilter) {
+            return;
+        }
 
-        elements.storeFilter.innerHTML =
+        const current =
+            el.storeFilter.value;
+
+        el.storeFilter.innerHTML =
             `<option value="all">All Stores</option>`;
 
         state.stores.forEach(store => {
-            const id = storeId(store);
+            const id =
+                getStoreId(store);
 
-            if (!id) return;
-
-            const name =
-                store.store_name ??
-                store.name ??
-                id;
+            if (!id) {
+                return;
+            }
 
             const option =
                 document.createElement("option");
 
             option.value = id;
-            option.textContent = name;
+            option.textContent =
+                getStoreName(store);
 
-            elements.storeFilter.appendChild(option);
+            el.storeFilter.appendChild(option);
         });
 
         if (
-            [...elements.storeFilter.options]
-                .some(option => option.value === current)
+            [...el.storeFilter.options].some(
+                option =>
+                    option.value === current
+            )
         ) {
-            elements.storeFilter.value = current;
+            el.storeFilter.value = current;
         }
     }
 
-    function populateStockStores() {
-        if (!elements.stockStore) return;
 
-        elements.stockStore.innerHTML =
-            `<option value="">Select store</option>`;
-
-        state.stores.forEach(store => {
-            const id = storeId(store);
-
-            if (!id) return;
-
-            const option =
-                document.createElement("option");
-
-            option.value = id;
-            option.textContent =
-                store.store_name ??
-                store.name ??
-                id;
-
-            elements.stockStore.appendChild(option);
-        });
-    }
-
-    function populateStockProducts() {
-        if (!elements.stockProduct) return;
-
-        elements.stockProduct.innerHTML =
-            `<option value="">Select product</option>`;
-
-        state.products.forEach(product => {
-            const id = productId(product);
-
-            if (!id) return;
-
-            const option =
-                document.createElement("option");
-
-            option.value = id;
-            option.textContent =
-                product.product_name ??
-                product.name ??
-                id;
-
-            elements.stockProduct.appendChild(option);
-        });
-    }
-
-    function populateCategoryFilter() {
-        if (!elements.categoryFilter) return;
+    function populateCategories() {
+        if (!el.categoryFilter) {
+            return;
+        }
 
         const current =
-            elements.categoryFilter.value;
+            el.categoryFilter.value;
 
         const categories = [
             ...new Set(
                 state.products
-                    .map(p =>
-                        p.category
+                    .map(
+                        product =>
+                            product.category
                     )
                     .filter(Boolean)
             )
-        ].sort();
+        ].sort(
+            (a, b) =>
+                String(a).localeCompare(
+                    String(b)
+                )
+        );
 
-        elements.categoryFilter.innerHTML =
+        el.categoryFilter.innerHTML =
             `<option value="all">All Categories</option>`;
 
         categories.forEach(category => {
@@ -654,98 +927,195 @@
             option.value = category;
             option.textContent = category;
 
-            elements.categoryFilter.appendChild(option);
+            el.categoryFilter.appendChild(option);
         });
 
         if (
             categories.includes(current)
         ) {
-            elements.categoryFilter.value = current;
+            el.categoryFilter.value =
+                current;
         }
     }
+
+
+    function populateStockStores() {
+        if (!el.stockStore) {
+            return;
+        }
+
+        const current =
+            el.stockStore.value;
+
+        el.stockStore.innerHTML =
+            `<option value="">Select store</option>`;
+
+        state.stores.forEach(store => {
+            const id =
+                getStoreId(store);
+
+            if (!id) {
+                return;
+            }
+
+            const option =
+                document.createElement("option");
+
+            option.value = id;
+            option.textContent =
+                getStoreName(store);
+
+            el.stockStore.appendChild(option);
+        });
+
+        if (
+            [...el.stockStore.options].some(
+                option =>
+                    option.value === current
+            )
+        ) {
+            el.stockStore.value =
+                current;
+        }
+    }
+
+
+    function populateStockProducts() {
+        if (!el.stockProduct) {
+            return;
+        }
+
+        el.stockProduct.innerHTML =
+            `<option value="">Select product</option>`;
+
+        state.products.forEach(product => {
+            const id =
+                getProductId(product);
+
+            if (!id) {
+                return;
+            }
+
+            const option =
+                document.createElement("option");
+
+            option.value = id;
+            option.textContent =
+                getProductName(product);
+
+            el.stockProduct.appendChild(option);
+        });
+    }
+
+
+    /* =========================================================
+       FILTERS
+       ========================================================= */
 
     function applyFilters() {
         const search =
             String(
-                elements.searchInput?.value || ""
-            ).trim().toLowerCase();
+                el.searchInput?.value ||
+                ""
+            )
+            .trim()
+            .toLowerCase();
 
         const category =
-            elements.categoryFilter?.value || "all";
+            el.categoryFilter?.value ||
+            "all";
 
         const status =
-            elements.statusFilter?.value ||
+            el.statusFilter?.value ||
             state.currentStatus ||
             "all";
 
         const store =
-            elements.storeFilter?.value || "all";
+            el.storeFilter?.value ||
+            "all";
 
-        let items = [...state.inventory];
+        let items =
+            [...state.inventory];
 
         if (store !== "all") {
-            items = items.filter(
-                item =>
-                    String(item.store_id) ===
-                    String(store)
-            );
+            items =
+                items.filter(
+                    item =>
+                        String(item.store_id) ===
+                        String(store)
+                );
         }
 
         if (category !== "all") {
-            items = items.filter(
-                item =>
-                    String(item.category) ===
-                    String(category)
-            );
+            items =
+                items.filter(
+                    item =>
+                        String(item.category) ===
+                        String(category)
+                );
         }
 
         if (search) {
-            items = items.filter(item => {
-                const text = [
-                    item.product_name,
-                    item.category,
-                    item.store_name,
-                    item.product_id
-                ]
+            items =
+                items.filter(item => {
+                    const searchable = [
+                        item.product_name,
+                        item.product_id,
+                        item.category,
+                        item.store_name
+                    ]
                     .join(" ")
                     .toLowerCase();
 
-                return text.includes(search);
-            });
+                    return searchable.includes(
+                        search
+                    );
+                });
         }
 
         if (status !== "all") {
-            items = items.filter(
-                item =>
-                    getInventoryStatus(item) ===
-                    status
-            );
+            items =
+                items.filter(
+                    item =>
+                        statusFor(item) ===
+                        status
+                );
         }
 
-        items = sortInventory(items);
+        items = sortItems(items);
 
         state.filteredInventory = items;
 
-        renderInventoryTable(items);
-        updateRecordCount(items.length);
+        renderTable(items);
+
+        text(
+            el.recordCount,
+            `${integer(items.length)} ${items.length === 1 ? "record" : "records"}`
+        );
+
+        updateClearFilterVisibility();
     }
 
-    function sortInventory(items) {
+
+    function sortItems(items) {
         const sort =
-            elements.sortFilter?.value ||
+            el.sortFilter?.value ||
             "risk";
 
         return items.sort((a, b) => {
             switch (sort) {
+
                 case "stock-high":
                     return b.stock - a.stock;
+
 
                 case "stock-low":
                     return a.stock - b.stock;
 
+
                 case "days-low": {
-                    const ad = getDaysLeft(a);
-                    const bd = getDaysLeft(b);
+                    const ad = daysLeft(a);
+                    const bd = daysLeft(b);
 
                     return (
                         (ad ?? Infinity) -
@@ -753,127 +1123,276 @@
                     );
                 }
 
+
                 case "name":
                     return String(
                         a.product_name
                     ).localeCompare(
-                        String(b.product_name)
+                        String(
+                            b.product_name
+                        )
                     );
+
 
                 case "risk":
                 default:
-                    return riskScore(b) - riskScore(a);
+                    return (
+                        riskScore(b) -
+                        riskScore(a)
+                    );
             }
         });
     }
 
+
     function riskScore(item) {
         const status =
-            getInventoryStatus(item);
+            statusFor(item);
 
-        const statusScore = {
-            stockout: 4,
-            low: 3,
-            slow: 2,
-            healthy: 1
-        };
+        const score =
+            statusRank(status);
 
+        const days =
+            daysLeft(item);
+
+        if (days !== null) {
+            return (
+                score * 1000 +
+                Math.max(
+                    0,
+                    100 - days
+                )
+            );
+        }
+
+        return score * 1000;
+    }
+
+
+    function hasActiveFilters() {
         return (
-            statusScore[status] || 0
+            (
+                el.searchInput?.value ||
+                ""
+            ).trim() !== "" ||
+
+            (
+                el.categoryFilter?.value ||
+                "all"
+            ) !== "all" ||
+
+            (
+                el.statusFilter?.value ||
+                "all"
+            ) !== "all" ||
+
+            (
+                el.storeFilter?.value ||
+                "all"
+            ) !== "all"
         );
     }
 
-    // ---------------------------------------------------------
-    // Render summary
-    // ---------------------------------------------------------
+
+    function updateClearFilterVisibility() {
+        if (!el.clearFilterBtn) {
+            return;
+        }
+
+        if (hasActiveFilters()) {
+            show(el.clearFilterBtn);
+        } else {
+            hide(el.clearFilterBtn);
+        }
+    }
+
+
+    function clearFilters() {
+        if (el.searchInput) {
+            el.searchInput.value = "";
+        }
+
+        if (el.categoryFilter) {
+            el.categoryFilter.value = "all";
+        }
+
+        if (el.statusFilter) {
+            el.statusFilter.value = "all";
+        }
+
+        if (el.storeFilter) {
+            el.storeFilter.value = "all";
+        }
+
+        state.currentStatus = "all";
+
+        el.statusButtons.forEach(button => {
+            button.classList.toggle(
+                "active",
+                button.dataset.status === "all"
+            );
+        });
+
+        /*
+         * Re-load all-store inventory because
+         * store filtering changes the API request.
+         */
+        loadInventory()
+            .then(() => {
+                render();
+            })
+            .catch(error => {
+                console.error(
+                    "Unable to reset inventory:",
+                    error
+                );
+
+                applyFilters();
+            });
+    }
+
+
+    /* =========================================================
+       SUMMARY
+       ========================================================= */
 
     function renderSummary() {
-        const inventory = state.inventory;
+        const items =
+            state.inventory;
 
-        const totalStock = inventory.reduce(
-            (sum, item) =>
-                sum + number(item.stock),
-            0
-        );
+        const totalStock =
+            items.reduce(
+                (sum, item) =>
+                    sum + num(item.stock),
+                0
+            );
 
-        const products = new Set(
-            inventory.map(
-                item => item.product_id
-            )
-        );
+        const products =
+            new Set(
+                items.map(
+                    item =>
+                        item.product_id
+                )
+            );
 
-        const immediateRisk =
-            inventory.filter(item => {
-                const status =
-                    getInventoryStatus(item);
-
-                return (
-                    status === "stockout" ||
-                    status === "low"
-                );
-            }).length;
-
-        const excessRisk =
-            inventory.filter(item =>
-                getInventoryStatus(item) ===
-                "slow"
-            ).length;
-
-        setText(
-            elements.totalStock,
-            formatInteger(totalStock)
-        );
-
-        setText(
-            elements.totalProducts,
-            formatInteger(products.size)
-        );
-
-        setText(
-            elements.immediateRisk,
-            formatInteger(immediateRisk)
-        );
-
-        setText(
-            elements.excessRisk,
-            formatInteger(excessRisk)
-        );
-    }
-
-    function updateRecordCount(count) {
-        setText(
-            elements.recordCount,
-            formatInteger(count)
-        );
-    }
-
-    // ---------------------------------------------------------
-    // Render inventory table
-    // ---------------------------------------------------------
-
-    function renderInventoryTable(items) {
-        if (!elements.inventoryTableBody) {
-            return;
-        }
-
-        elements.inventoryTableBody.innerHTML = "";
-
-        if (!items.length) {
-            show(elements.inventoryEmpty);
-            return;
-        }
-
-        hide(elements.inventoryEmpty);
+        let immediate = 0;
+        let excess = 0;
 
         items.forEach(item => {
             const status =
-                getInventoryStatus(item);
+                statusFor(item);
 
-            const dailySales =
-                getDailySales(item);
+            if (
+                status === "stockout" ||
+                status === "low"
+            ) {
+                immediate++;
+            }
 
-            const daysLeft =
-                getDaysLeft(item);
+            if (status === "slow") {
+                excess++;
+            }
+        });
+
+        text(
+            el.totalStock,
+            integer(totalStock)
+        );
+
+        text(
+            el.totalProducts,
+            integer(products.size)
+        );
+
+        text(
+            el.immediateRisk,
+            integer(immediate)
+        );
+
+        text(
+            el.excessRisk,
+            integer(excess)
+        );
+    }
+
+
+    /* =========================================================
+       STATUS COUNTS
+       ========================================================= */
+
+    function renderStatusCounts() {
+        const counts = {
+            healthy: 0,
+            low: 0,
+            stockout: 0,
+            slow: 0
+        };
+
+        state.inventory.forEach(item => {
+            const status =
+                statusFor(item);
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    counts,
+                    status
+                )
+            ) {
+                counts[status]++;
+            }
+        });
+
+        text(
+            el.healthyCount,
+            integer(counts.healthy)
+        );
+
+        text(
+            el.lowCount,
+            integer(counts.low)
+        );
+
+        text(
+            el.stockoutCount,
+            integer(counts.stockout)
+        );
+
+        text(
+            el.slowCount,
+            integer(counts.slow)
+        );
+    }
+
+
+    /* =========================================================
+       TABLE
+       ========================================================= */
+
+    function renderTable(items) {
+        if (!el.tableBody) {
+            return;
+        }
+
+        el.tableBody.innerHTML = "";
+
+        if (!items.length) {
+            hide(el.tableWrapper);
+            show(el.emptyState);
+            return;
+        }
+
+        hide(el.emptyState);
+        show(el.tableWrapper);
+
+        items.forEach(item => {
+            const status =
+                statusFor(item);
+
+            const daily =
+                dailySales(item);
+
+            const days =
+                daysLeft(item);
 
             const row =
                 document.createElement("tr");
@@ -884,6 +1403,15 @@
             row.dataset.storeId =
                 item.store_id;
 
+            const priority =
+                status === "stockout"
+                    ? "Immediate"
+                    : status === "low"
+                        ? "Review"
+                        : status === "slow"
+                            ? "Monitor"
+                            : "Stable";
+
             row.innerHTML = `
                 <td>
                     <div class="product-cell">
@@ -892,6 +1420,7 @@
                                 item.product_name
                             )}
                         </strong>
+
                         <span>
                             ${escapeHTML(
                                 item.product_id
@@ -913,33 +1442,51 @@
                 </td>
 
                 <td>
-                    <strong>
-                        ${formatInteger(
-                            item.stock
-                        )}
-                    </strong>
+                    <div class="stock-cell">
+                        <strong>
+                            ${integer(item.stock)}
+                        </strong>
+
+                        ${
+                            item.stock <= 0
+                                ? `<span class="stock-warning">Out</span>`
+                                : ""
+                        }
+                    </div>
                 </td>
 
                 <td>
-                    ${dailySales > 0
-                        ? dailySales.toFixed(1)
-                        : "—"}
+                    ${
+                        daily > 0
+                            ? `${decimal(daily)}`
+                            : "—"
+                    }
                 </td>
 
                 <td>
-                    <span class="days-left ${getDaysClass(
-                        daysLeft
-                    )}">
-                        ${formatDays(daysLeft)}
+                    <span
+                        class="days-left ${daysClass(days)}"
+                    >
+                        ${
+                            days === null
+                                ? "No sales data"
+                                : `${decimal(days)} days`
+                        }
                     </span>
                 </td>
 
                 <td>
-                    <span class="inventory-status ${getStatusClass(
-                        status
-                    )}">
-                        ${getStatusLabel(status)}
-                    </span>
+                    <div class="status-cell">
+                        <span
+                            class="inventory-status status-${status}"
+                        >
+                            ${statusLabel(status)}
+                        </span>
+
+                        <small>
+                            ${priority}
+                        </small>
+                    </div>
                 </td>
 
                 <td>
@@ -954,19 +1501,19 @@
                             item.store_id
                         )}"
                     >
-                        View
+                        Inspect
                     </button>
                 </td>
             `;
 
-            elements.inventoryTableBody
-                .appendChild(row);
+            el.tableBody.appendChild(row);
         });
     }
 
-    function getDaysClass(days) {
+
+    function daysClass(days) {
         if (days === null) {
-            return "";
+            return "days-unknown";
         }
 
         if (days <= 3) {
@@ -980,25 +1527,29 @@
         return "days-good";
     }
 
-    // ---------------------------------------------------------
-    // Attention section
-    // ---------------------------------------------------------
+
+    /* =========================================================
+       ATTENTION
+       ========================================================= */
 
     function renderAttention() {
-        if (!elements.attentionGrid) {
+        if (!el.attentionGrid) {
             return;
         }
 
         const alerts =
-            [...state.attention];
+            state.attention.slice(0, 6);
 
         if (!alerts.length) {
-            elements.attentionGrid.innerHTML = `
+            el.attentionGrid.innerHTML = `
                 <div class="attention-empty">
-                    <strong>No active inventory alerts</strong>
+                    <strong>
+                        No active attention signals
+                    </strong>
+
                     <span>
-                        Current inventory does not contain
-                        any detected attention signals.
+                        StoreSense has not detected an
+                        inventory condition requiring attention.
                     </span>
                 </div>
             `;
@@ -1006,181 +1557,251 @@
             return;
         }
 
-        const limited =
-            alerts.slice(0, 6);
-
-        elements.attentionGrid.innerHTML =
-            limited.map(alert => {
-                const type =
-                    String(
-                        alert.type ??
-                        alert.alert_type ??
-                        alert.category ??
-                        "attention"
-                    );
-
-                const pid =
-                    productId(alert);
-
-                const sid =
-                    storeId(alert);
-
-                const product =
-                    alert.product_name ??
-                    state.products.find(
-                        p => productId(p) === pid
-                    )?.product_name ??
-                    "Unknown product";
-
-                const store =
-                    alert.store_name ??
-                    state.stores.find(
-                        s => storeId(s) === sid
-                    )?.store_name ??
-                    "";
-
-                const stock =
-                    alert.current_stock ??
-                    alert.stock ??
-                    0;
-
-                const days =
-                    alert.days_to_stockout ??
-                    alert.days_left;
-
-                const units =
-                    alert.units_30d ??
-                    alert.sales_30d;
-
-                const change =
-                    alert.change_pct ??
-                    alert.percent_change;
-
-                return `
-                    <button
-                        type="button"
-                        class="attention-card"
-                        data-alert-product="${escapeHTML(
-                            pid
-                        )}"
-                        data-alert-store="${escapeHTML(
-                            sid
-                        )}"
-                    >
-                        <div class="attention-card-top">
-                            <span class="attention-type">
-                                ${escapeHTML(
-                                    formatAlertType(type)
-                                )}
-                            </span>
-
-                            <span class="attention-priority">
-                                ${escapeHTML(
-                                    alert.priority ??
-                                    alert.severity ??
-                                    ""
-                                )}
-                            </span>
-                        </div>
-
-                        <h4>
-                            ${escapeHTML(product)}
-                        </h4>
-
-                        <p>
-                            ${escapeHTML(store)}
-                        </p>
-
-                        <div class="attention-facts">
-                            ${stock !== undefined
-                                ? `<span>
-                                    Stock:
-                                    <strong>${formatInteger(stock)}</strong>
-                                   </span>`
-                                : ""}
-
-                            ${days !== undefined
-                                ? `<span>
-                                    Days left:
-                                    <strong>${number(days).toFixed(1)}</strong>
-                                   </span>`
-                                : ""}
-
-                            ${units !== undefined
-                                ? `<span>
-                                    30d sales:
-                                    <strong>${formatInteger(units)}</strong>
-                                   </span>`
-                                : ""}
-
-                            ${change !== undefined
-                                ? `<span>
-                                    Change:
-                                    <strong>${formatChange(change)}</strong>
-                                   </span>`
-                                : ""}
-                        </div>
-                    </button>
-                `;
-            }).join("");
+        el.attentionGrid.innerHTML =
+            alerts
+                .map(
+                    alert =>
+                        renderAttentionCard(alert)
+                )
+                .join("");
     }
 
-    function formatAlertType(type) {
-        const value =
-            String(type || "")
-                .replace(/[-_]/g, " ")
-                .trim();
 
-        if (!value) {
-            return "Attention";
+    function renderAttentionCard(alert) {
+        const pid =
+            getProductId(alert);
+
+        const sid =
+            getStoreId(alert);
+
+        const product =
+            alert.product_name ??
+            getProductName(
+                findProduct(pid)
+            );
+
+        const store =
+            alert.store_name ??
+            getStoreName(
+                findStore(sid)
+            );
+
+        const type =
+            alert.type ??
+            alert.alert_type ??
+            alert.category ??
+            "Attention";
+
+        const priority =
+            alert.priority ??
+            alert.severity ??
+            "Review";
+
+        const stock =
+            alert.current_stock ??
+            alert.stock;
+
+        const units =
+            alert.units_30d ??
+            alert.sales_30d ??
+            alert.units_sold_30d;
+
+        const days =
+            alert.days_to_stockout ??
+            alert.days_left ??
+            alert.days_remaining;
+
+        const change =
+            alert.change_pct ??
+            alert.percent_change;
+
+        let facts = "";
+
+        if (
+            stock !== undefined &&
+            stock !== null &&
+            Number.isFinite(Number(stock))
+        ) {
+            facts += `
+                <span>
+                    Stock
+                    <strong>
+                        ${integer(stock)}
+                    </strong>
+                </span>
+            `;
         }
 
-        return value
-            .split(" ")
-            .map(word =>
-                word.charAt(0).toUpperCase() +
-                word.slice(1)
-            )
-            .join(" ");
+        if (
+            days !== undefined &&
+            days !== null &&
+            Number.isFinite(Number(days))
+        ) {
+            facts += `
+                <span>
+                    Days left
+                    <strong>
+                        ${decimal(days)}
+                    </strong>
+                </span>
+            `;
+        }
+
+        if (
+            units !== undefined &&
+            units !== null &&
+            Number.isFinite(Number(units))
+        ) {
+            facts += `
+                <span>
+                    30d sales
+                    <strong>
+                        ${integer(units)}
+                    </strong>
+                </span>
+            `;
+        }
+
+        if (
+            change !== undefined &&
+            change !== null &&
+            Number.isFinite(Number(change))
+        ) {
+            facts += `
+                <span>
+                    Change
+                    <strong>
+                        ${formatChange(change)}
+                    </strong>
+                </span>
+            `;
+        }
+
+        return `
+            <button
+                type="button"
+                class="attention-card"
+                data-alert-product="${escapeHTML(pid)}"
+                data-alert-store="${escapeHTML(sid)}"
+            >
+                <div class="attention-card-top">
+                    <span class="attention-type">
+                        ${escapeHTML(
+                            formatAlertType(type)
+                        )}
+                    </span>
+
+                    <span class="attention-priority">
+                        ${escapeHTML(
+                            String(priority)
+                        )}
+                    </span>
+                </div>
+
+                <h4>
+                    ${escapeHTML(product)}
+                </h4>
+
+                <p>
+                    ${escapeHTML(
+                        store ||
+                        "Store-level signal"
+                    )}
+                </p>
+
+                <div class="attention-facts">
+                    ${facts}
+                </div>
+
+                <div class="attention-open">
+                    Inspect evidence →
+                </div>
+            </button>
+        `;
     }
+
+
+    function formatAlertType(value) {
+        return String(
+            value || "Attention"
+        )
+            .replace(/[-_]/g, " ")
+            .replace(
+                /\b\w/g,
+                c => c.toUpperCase()
+            );
+    }
+
 
     function formatChange(value) {
-        const n = number(value);
+        const n = num(value);
 
-        if (n > 0) {
-            return `+${n.toFixed(1)}%`;
-        }
-
-        return `${n.toFixed(1)}%`;
+        return n > 0
+            ? `+${decimal(n)}%`
+            : `${decimal(n)}%`;
     }
 
-    // ---------------------------------------------------------
-    // Product detail / evidence
-    // ---------------------------------------------------------
 
-    async function openProductModal(
-        productIdValue,
-        storeIdValue
+    /* =========================================================
+       PRODUCT INSPECTION
+       ========================================================= */
+
+    async function inspectProduct(
+        productId,
+        storeId
     ) {
-        const item =
-            state.inventory.find(
-                inventoryItem =>
-                    String(
-                        inventoryItem.product_id
-                    ) === String(productIdValue) &&
-                    (
-                        !storeIdValue ||
-                        String(
-                            inventoryItem.store_id
-                        ) === String(storeIdValue)
-                    )
+        let item =
+            findInventoryItem(
+                productId,
+                storeId
             );
+
+        /*
+         * If the current inventory view is filtered
+         * and does not contain the item, try loading
+         * the selected store directly.
+         */
+        if (!item && storeId) {
+            try {
+                const payload =
+                    await request(
+                        `/api/inventory?store_id=${encodeURIComponent(
+                            storeId
+                        )}`
+                    );
+
+                const records =
+                    arrayFrom(
+                        payload,
+                        [
+                            "items",
+                            "inventory",
+                            "data"
+                        ]
+                    ).map(normalizeInventory);
+
+                item =
+                    records.find(
+                        record =>
+                            String(
+                                record.product_id
+                            ) ===
+                            String(productId)
+                    );
+
+            } catch (error) {
+                console.warn(
+                    "Unable to load inspection item:",
+                    error
+                );
+            }
+        }
 
         if (!item) {
             console.warn(
                 "Inventory item not found",
-                productIdValue,
-                storeIdValue
+                productId,
+                storeId
             );
 
             return;
@@ -1188,33 +1809,34 @@
 
         state.selectedItem = item;
 
-        renderModalBase(item);
+        renderMovement(item);
+        renderModal(item);
 
-        show(elements.productModal);
+        show(el.productModal);
 
-        // Evidence is optional.
-        // The modal remains useful even if the endpoint
-        // cannot provide additional evidence.
         try {
-            const params =
-                storeIdValue
+            const query =
+                storeId
                     ? `?store_id=${encodeURIComponent(
-                        storeIdValue
+                        storeId
                     )}`
                     : "";
 
             const payload =
-                await fetchJSON(
+                await request(
                     `/api/evidence/${encodeURIComponent(
-                        productIdValue
-                    )}${params}`
+                        productId
+                    )}${query}`
                 );
 
-            renderEvidence(payload, item);
+            renderEvidence(
+                payload,
+                item
+            );
 
         } catch (error) {
             console.warn(
-                "Evidence unavailable:",
+                "Evidence endpoint unavailable:",
                 error
             );
 
@@ -1225,449 +1847,559 @@
         }
     }
 
-    function renderModalBase(item) {
-        const status =
-            getInventoryStatus(item);
 
-        const dailySales =
-            getDailySales(item);
+    /* =========================================================
+       PRODUCT MODAL
+       ========================================================= */
+
+    function renderModal(item) {
+        const status =
+            statusFor(item);
+
+        const daily =
+            dailySales(item);
 
         const days =
-            getDaysLeft(item);
+            daysLeft(item);
 
-        const sales30 =
-            get30DaySales(item);
+        const recentSales =
+            sales30(item);
 
-        setText(
-            elements.modalProductName,
+        text(
+            el.modalProductName,
             item.product_name
         );
 
-        setText(
-            elements.modalProductMeta,
+        text(
+            el.modalProductMeta,
             `${item.category} • ${item.store_name}`
         );
 
-        if (elements.modalStatus) {
-            elements.modalStatus.textContent =
-                getStatusLabel(status);
+        if (el.modalStatus) {
+            el.modalStatus.textContent =
+                statusLabel(status);
 
-            elements.modalStatus.className =
-                `inventory-status ${getStatusClass(status)}`;
+            el.modalStatus.className =
+                `modal-status inventory-status status-${status}`;
         }
 
-        setText(
-            elements.modalStock,
-            formatInteger(item.stock)
+        text(
+            el.modalStock,
+            integer(item.stock)
         );
 
-        setText(
-            elements.modalDailySales,
-            dailySales > 0
-                ? dailySales.toFixed(1)
+        text(
+            el.modalDailySales,
+            daily > 0
+                ? decimal(daily)
                 : "—"
         );
 
-        setText(
-            elements.modalDaysLeft,
-            formatDays(days)
+        text(
+            el.modalDaysLeft,
+            days === null
+                ? "—"
+                : `${decimal(days)} days`
         );
 
-        setText(
-            elements.modal30DaySales,
-            formatInteger(sales30)
+        text(
+            el.modal30DaySales,
+            integer(recentSales)
         );
 
         renderRecommendation(item);
 
-        if (elements.modalEvidence) {
-            elements.modalEvidence.innerHTML = `
+        if (el.modalEvidence) {
+            el.modalEvidence.innerHTML = `
                 <div class="evidence-loading">
-                    Loading evidence...
+                    Loading verified evidence...
                 </div>
             `;
         }
     }
 
+
     function renderRecommendation(item) {
         const status =
-            getInventoryStatus(item);
+            statusFor(item);
 
         const alert =
-            findAttention(item);
+            attentionFor(item);
 
         let recommendation = "";
 
         if (alert?.recommendation) {
             recommendation =
                 alert.recommendation;
+
         } else if (alert?.action) {
             recommendation =
                 alert.action;
+
         } else if (status === "stockout") {
             recommendation =
                 "Review replenishment immediately. " +
-                "The current stock level and sales rate " +
-                "indicate near-term stock-out risk.";
+                "Current stock coverage indicates a near-term " +
+                "stock-out condition.";
+
         } else if (status === "low") {
             recommendation =
-                "Monitor stock closely and plan replenishment " +
-                "before projected stock reaches zero.";
+                "Plan replenishment before projected stock " +
+                "coverage reaches zero.";
+
         } else if (status === "slow") {
             recommendation =
-                "Review this item's inventory level before " +
-                "ordering more. Sales velocity is currently low.";
+                "Avoid automatically increasing stock. " +
+                "Review the current inventory level against " +
+                "recent sales velocity.";
+
         } else {
             recommendation =
                 "No immediate inventory action is indicated " +
                 "by the available stock and sales signals.";
         }
 
-        setText(
-            elements.modalRecommendation,
+        text(
+            el.modalRecommendation,
             recommendation
         );
     }
 
-    function renderEvidence(payload, item) {
-        if (!elements.modalEvidence) {
+
+    /* =========================================================
+       EVIDENCE
+       ========================================================= */
+
+    function renderEvidence(
+        payload,
+        item
+    ) {
+        if (!el.modalEvidence) {
             return;
         }
+
+        const daily =
+            dailySales(item);
+
+        const days =
+            daysLeft(item);
+
+        const recentSales =
+            sales30(item);
+
+        let html = `
+            <div class="evidence-row">
+                <span>
+                    Current stock
+                </span>
+
+                <strong>
+                    ${integer(item.stock)} units
+                </strong>
+            </div>
+
+            <div class="evidence-row">
+                <span>
+                    30-day units sold
+                </span>
+
+                <strong>
+                    ${integer(recentSales)}
+                </strong>
+            </div>
+
+            <div class="evidence-row">
+                <span>
+                    Average daily sales
+                </span>
+
+                <strong>
+                    ${
+                        daily > 0
+                            ? `${decimal(daily)} units/day`
+                            : "No sales data"
+                    }
+                </strong>
+            </div>
+
+            <div class="evidence-row">
+                <span>
+                    Estimated coverage
+                </span>
+
+                <strong>
+                    ${
+                        days === null
+                            ? "Not calculable"
+                            : `${decimal(days)} days`
+                    }
+                </strong>
+            </div>
+        `;
 
         const evidence =
             payload?.evidence ??
             payload?.records ??
             payload?.items ??
-            payload?.data ??
-            payload;
+            payload?.data;
 
-        let html = "";
-
-        const stock =
-            item.stock;
-
-        const daily =
-            getDailySales(item);
-
-        const days =
-            getDaysLeft(item);
-
-        const sales30 =
-            get30DaySales(item);
-
-        html += `
-            <div class="evidence-row">
-                <span>Current stock</span>
-                <strong>
-                    ${formatInteger(stock)} units
-                </strong>
-            </div>
-        `;
-
-        html += `
-            <div class="evidence-row">
-                <span>30-day units sold</span>
-                <strong>
-                    ${formatInteger(sales30)}
-                </strong>
-            </div>
-        `;
-
-        html += `
-            <div class="evidence-row">
-                <span>Average daily sales</span>
-                <strong>
-                    ${daily > 0
-                        ? daily.toFixed(1)
-                        : "No sales data"}
-                </strong>
-            </div>
-        `;
-
-        html += `
-            <div class="evidence-row">
-                <span>Projected stock coverage</span>
-                <strong>
-                    ${formatDays(days)}
-                </strong>
-            </div>
-        `;
-
-        // If the API gives explicit evidence, show it.
         if (
             evidence &&
-            typeof evidence === "object" &&
-            !Array.isArray(evidence)
+            typeof evidence === "object"
         ) {
-            const usefulEntries =
-                Object.entries(evidence)
-                    .filter(([key, value]) =>
-                        value !== null &&
-                        value !== undefined &&
-                        ![
-                            "product_id",
-                            "store_id"
-                        ].includes(key)
-                    )
-                    .slice(0, 8);
+            const entries =
+                Array.isArray(evidence)
+                    ? evidence.slice(0, 5)
+                    : Object.entries(evidence)
+                        .filter(
+                            ([key, value]) =>
+                                value !== null &&
+                                value !== undefined &&
+                                ![
+                                    "product_id",
+                                    "store_id"
+                                ].includes(key)
+                        )
+                        .slice(0, 8);
 
-            if (usefulEntries.length) {
+            if (entries.length) {
                 html += `
-                    <div class="evidence-extra">
-                        <div class="evidence-extra-title">
-                            API evidence
+                    <div class="evidence-api">
+                        <div class="evidence-api-title">
+                            BACKEND EVIDENCE
                         </div>
                 `;
 
-                usefulEntries.forEach(
-                    ([key, value]) => {
-                        let display = value;
-
-                        if (
-                            typeof value === "object"
-                        ) {
-                            display =
-                                JSON.stringify(value);
-                        }
-
+                if (
+                    Array.isArray(evidence)
+                ) {
+                    entries.forEach(record => {
                         html += `
                             <div class="evidence-row">
                                 <span>
-                                    ${escapeHTML(
-                                        prettifyKey(key)
-                                    )}
+                                    Record
                                 </span>
 
                                 <strong>
                                     ${escapeHTML(
-                                        display
+                                        JSON.stringify(record)
                                     )}
                                 </strong>
                             </div>
                         `;
-                    }
-                );
+                    });
 
-                html += `</div>`;
+                } else {
+                    entries.forEach(
+                        ([key, value]) => {
+                            let display = value;
+
+                            if (
+                                typeof value ===
+                                "object"
+                            ) {
+                                display =
+                                    JSON.stringify(
+                                        value
+                                    );
+                            }
+
+                            html += `
+                                <div class="evidence-row">
+                                    <span>
+                                        ${escapeHTML(
+                                            prettifyKey(key)
+                                        )}
+                                    </span>
+
+                                    <strong>
+                                        ${escapeHTML(
+                                            display
+                                        )}
+                                    </strong>
+                                </div>
+                            `;
+                        }
+                    );
+                }
+
+                html += `
+                    </div>
+                `;
             }
         }
 
-        elements.modalEvidence.innerHTML =
+        el.modalEvidence.innerHTML =
             html;
     }
+
 
     function prettifyKey(key) {
         return String(key)
             .replace(/_/g, " ")
-            .replace(/\b\w/g, c =>
-                c.toUpperCase()
+            .replace(
+                /\b\w/g,
+                c => c.toUpperCase()
             );
     }
 
-    // ---------------------------------------------------------
-    // Movement section
-    // ---------------------------------------------------------
+
+    /* =========================================================
+       STOCK POSITION
+       ========================================================= */
 
     function renderMovement(item) {
         if (!item) {
-            show(elements.movementEmpty);
-            hide(elements.movementContent);
+            show(el.movementEmpty);
+            hide(el.movementContent);
 
-            setText(
-                elements.selectedProduct,
-                "Select a product to inspect movement"
+            text(
+                el.selectedProduct,
+                "No product selected"
             );
 
             return;
         }
 
-        hide(elements.movementEmpty);
-        show(elements.movementContent);
+        hide(el.movementEmpty);
+        show(el.movementContent);
 
-        setText(
-            elements.selectedProduct,
+        text(
+            el.selectedProduct,
             `${item.product_name} • ${item.store_name}`
         );
 
         const stock =
-            number(item.stock);
+            num(item.stock);
 
         const sales =
-            get30DaySales(item);
+            sales30(item);
 
         const daily =
-            getDailySales(item);
+            dailySales(item);
 
         const days =
-            getDaysLeft(item);
+            daysLeft(item);
 
-        setText(
-            elements.movementStock,
-            formatInteger(stock)
+        text(
+            el.movementStock,
+            integer(stock)
         );
 
-        setText(
-            elements.movementSales,
-            formatInteger(sales)
+        text(
+            el.movementSales,
+            integer(sales)
         );
 
-        setText(
-            elements.movementDaily,
+        text(
+            el.movementDaily,
             daily > 0
-                ? daily.toFixed(1)
+                ? decimal(daily)
                 : "—"
         );
 
-        setText(
-            elements.movementDays,
-            formatDays(days)
+        text(
+            el.movementDays,
+            days === null
+                ? "—"
+                : `${decimal(days)} days`
         );
 
-        const status =
-            getInventoryStatus(item);
+        /*
+         * Coverage bar:
+         * 30 days = full planning horizon.
+         */
 
-        let coveragePercent = 0;
+        let percentage = 0;
 
         if (days !== null) {
-            coveragePercent =
+            percentage =
                 Math.min(
                     100,
                     Math.max(
                         0,
-                        (days / 30) * 100
+                        days / 30 * 100
                     )
                 );
         }
 
-        if (elements.movementBarFill) {
-            elements.movementBarFill.style.width =
-                `${coveragePercent}%`;
+        if (el.movementBarFill) {
+            el.movementBarFill.style.width =
+                `${percentage}%`;
         }
 
-        let movementPercent = "No trend data";
+        let coverageLabel =
+            "No sales basis";
 
-        const alert =
-            findAttention(item);
+        let insight =
+            "There is not enough recent sales data " +
+            "to estimate stock coverage.";
 
-        if (alert) {
-            const change =
-                alert.change_pct ??
-                alert.percent_change;
+        if (days !== null) {
+            if (days <= 3) {
+                coverageLabel =
+                    "Critical";
 
-            if (
-                change !== undefined &&
-                change !== null
-            ) {
-                movementPercent =
-                    formatChange(change);
+                insight =
+                    `At the current sales rate, approximately ` +
+                    `${decimal(days)} days of stock coverage remain. ` +
+                    `Immediate review is recommended.`;
+
+            } else if (days <= 7) {
+                coverageLabel =
+                    "Low";
+
+                insight =
+                    `Current stock provides approximately ` +
+                    `${decimal(days)} days of coverage at the observed ` +
+                    `sales velocity.`;
+
+            } else {
+                coverageLabel =
+                    "Adequate";
+
+                insight =
+                    `Current stock provides approximately ` +
+                    `${decimal(days)} days of coverage at the observed ` +
+                    `sales velocity.`;
             }
         }
 
-        setText(
-            elements.movementPercent,
-            movementPercent
+        text(
+            el.movementCoverageLabel,
+            coverageLabel
         );
 
-        // No inventory history API currently exists in the
-        // backend, so we deliberately do NOT fabricate a
-        // historical stock chart.
-        if (
-            elements.movementDaily
-        ) {
-            elements.movementDaily.title =
-                "Calculated from available 30-day sales data";
-        }
+        text(
+            el.movementInsightText,
+            insight
+        );
+
+        const alert =
+            attentionFor(item);
+
+        const change =
+            alert?.change_pct ??
+            alert?.percent_change;
+
+        text(
+            el.movementPercent,
+            change !== undefined &&
+            change !== null &&
+            Number.isFinite(Number(change))
+                ? formatChange(change)
+                : "No trend signal"
+        );
     }
 
-    // ---------------------------------------------------------
-    // Add stock modal
-    // ---------------------------------------------------------
+
+    /* =========================================================
+       STOCK UPDATE
+       ========================================================= */
 
     function openStockModal(prefill = {}) {
-        if (!elements.stockModal) {
-            return;
-        }
+        hideStockError();
 
-        hideStockFormError();
+        populateStockStores();
+        populateStockProducts();
 
-        if (elements.stockStore) {
-            elements.stockStore.value =
+        if (el.stockStore) {
+            el.stockStore.value =
                 prefill.storeId || "";
         }
 
-        if (elements.stockProduct) {
-            elements.stockProduct.value =
+        if (el.stockProduct) {
+            el.stockProduct.value =
                 prefill.productId || "";
         }
 
-        if (elements.stockQuantity) {
-            elements.stockQuantity.value = "";
+        if (el.stockQuantity) {
+            el.stockQuantity.value = "";
         }
 
-        if (elements.stockReason) {
-            elements.stockReason.value =
+        if (el.stockReason) {
+            el.stockReason.value =
                 "replenishment";
         }
 
-        show(elements.stockModal);
+        show(el.stockModal);
+
+        setTimeout(
+            () => {
+                el.stockQuantity?.focus();
+            },
+            50
+        );
     }
+
 
     function closeStockModal() {
-        hide(elements.stockModal);
-        hideStockFormError();
+        hide(el.stockModal);
+        hideStockError();
     }
 
-    function hideStockFormError() {
-        if (!elements.stockFormError) {
+
+    function hideStockError() {
+        if (!el.stockFormError) {
             return;
         }
 
-        elements.stockFormError.textContent = "";
-        elements.stockFormError.style.display =
-            "none";
+        el.stockFormError.textContent = "";
+
+        hide(el.stockFormError);
     }
 
-    function showStockFormError(message) {
-        if (!elements.stockFormError) {
+
+    function stockError(message) {
+        if (!el.stockFormError) {
             return;
         }
 
-        elements.stockFormError.textContent =
-            message;
+        text(
+            el.stockFormError,
+            message
+        );
 
-        elements.stockFormError.style.display =
-            "";
+        show(el.stockFormError);
     }
+
 
     async function saveStock() {
-        hideStockFormError();
+        if (state.savingStock) {
+            return;
+        }
 
-        const storeIdValue =
-            elements.stockStore?.value || "";
+        hideStockError();
 
-        const productIdValue =
-            elements.stockProduct?.value || "";
+        const storeId =
+            el.stockStore?.value ||
+            "";
+
+        const productId =
+            el.stockProduct?.value ||
+            "";
 
         const quantity =
-            number(
-                elements.stockQuantity?.value,
-                NaN
+            Number(
+                el.stockQuantity?.value
             );
 
         const reason =
-            elements.stockReason?.value ||
-            "replenishment";
+            (
+                el.stockReason?.value ||
+                "replenishment"
+            ).trim();
 
-        if (!storeIdValue) {
-            showStockFormError(
-                "Please select a store."
+        if (!storeId) {
+            stockError(
+                "Select a store."
             );
             return;
         }
 
-        if (!productIdValue) {
-            showStockFormError(
-                "Please select a product."
+        if (!productId) {
+            stockError(
+                "Select a product."
             );
             return;
         }
@@ -1676,65 +2408,111 @@
             !Number.isFinite(quantity) ||
             quantity <= 0
         ) {
-            showStockFormError(
-                "Enter a stock quantity greater than 0."
+            stockError(
+                "Enter a quantity greater than 0."
             );
             return;
         }
 
-        // The backend PUT endpoint currently sets the
-        // absolute stock value rather than incrementing it.
-        // Therefore we calculate:
-        //
-        // new stock = current stock + quantity
-        //
-        const existing =
-            state.inventory.find(
-                item =>
-                    String(item.store_id) ===
-                    String(storeIdValue) &&
-                    String(item.product_id) ===
-                    String(productIdValue)
-            );
+        /*
+         * Backend PUT /api/inventory sets
+         * absolute stock.
+         *
+         * Therefore:
+         *
+         * newStock = existingStock + quantity
+         */
 
-        const currentStock =
-            number(existing?.stock);
-
-        const newStock =
-            currentStock + quantity;
-
-        setSaveButton(true);
+        state.savingStock = true;
+        setSaveState(true);
 
         try {
-            await fetchJSON(
+            /*
+             * Always fetch selected store's
+             * current inventory first.
+             */
+            const payload =
+                await request(
+                    `/api/inventory?store_id=${encodeURIComponent(
+                        storeId
+                    )}`
+                );
+
+            const records =
+                arrayFrom(
+                    payload,
+                    [
+                        "items",
+                        "inventory",
+                        "data"
+                    ]
+                );
+
+            const existingRaw =
+                records.find(
+                    record =>
+                        String(
+                            getProductId(record)
+                        ) ===
+                        String(productId)
+                );
+
+            const currentStock =
+                num(
+                    existingRaw?.stock ??
+                    existingRaw?.quantity ??
+                    existingRaw?.current_stock ??
+                    0
+                );
+
+            const newStock =
+                currentStock + quantity;
+
+            await request(
                 "/api/inventory",
                 {
                     method: "PUT",
+
                     body: JSON.stringify({
-                        store_id: storeIdValue,
-                        product_id: productIdValue,
-                        stock: newStock,
-                        reason
+                        store_id:
+                            storeId,
+
+                        product_id:
+                            productId,
+
+                        stock:
+                            newStock,
+
+                        reason:
+                            reason ||
+                            "replenishment"
                     })
                 }
             );
 
             closeStockModal();
 
+            /*
+             * Reload the page data.
+             */
             await loadAll();
 
-            // Keep the updated product selected.
+            /*
+             * Restore selected item.
+             */
             const updated =
-                state.inventory.find(
-                    item =>
-                        String(item.store_id) ===
-                        String(storeIdValue) &&
-                        String(item.product_id) ===
-                        String(productIdValue)
+                findInventoryItem(
+                    productId,
+                    storeId
                 );
 
             if (updated) {
-                renderMovement(updated);
+                state.selectedItem =
+                    updated;
+
+                renderMovement(
+                    updated
+                );
             }
 
         } catch (error) {
@@ -1743,265 +2521,489 @@
                 error
             );
 
-            showStockFormError(
+            stockError(
                 error.message ||
-                "Unable to update stock."
+                "Unable to update inventory."
             );
 
         } finally {
-            setSaveButton(false);
+            state.savingStock = false;
+            setSaveState(false);
         }
     }
 
-    function setSaveButton(saving) {
-        if (!elements.saveStockBtn) {
+
+    function setSaveState(saving) {
+        if (!el.saveStockBtn) {
             return;
         }
 
-        elements.saveStockBtn.disabled =
+        el.saveStockBtn.disabled =
             saving;
 
-        elements.saveStockBtn.textContent =
+        el.saveStockBtn.textContent =
             saving
-                ? "Saving..."
-                : "Save Stock";
+                ? "Updating..."
+                : "Add Stock";
     }
 
-    // ---------------------------------------------------------
-    // Status tiles
-    // ---------------------------------------------------------
 
-    function setStatusFilter(status) {
+    /* =========================================================
+       EXPORT
+       ========================================================= */
+
+    function exportInventory() {
+        const items =
+            state.filteredInventory.length
+                ? state.filteredInventory
+                : state.inventory;
+
+        if (!items.length) {
+            window.alert(
+                "There is no inventory data to export."
+            );
+
+            return;
+        }
+
+        const headers = [
+            "Product ID",
+            "Product",
+            "Category",
+            "Store ID",
+            "Store",
+            "Stock",
+            "Avg Daily Sales",
+            "Days Left",
+            "Status"
+        ];
+
+        const rows =
+            items.map(item => [
+                item.product_id,
+                item.product_name,
+                item.category,
+                item.store_id,
+                item.store_name,
+                item.stock,
+                dailySales(item),
+                daysLeft(item) ?? "",
+                statusLabel(
+                    statusFor(item)
+                )
+            ]);
+
+        const csv =
+            [
+                headers,
+                ...rows
+            ]
+                .map(row =>
+                    row
+                        .map(value =>
+                            `"${String(
+                                value ?? ""
+                            ).replace(
+                                /"/g,
+                                '""'
+                            )}"`
+                        )
+                        .join(",")
+                )
+                .join("\n");
+
+        const blob =
+            new Blob(
+                [csv],
+                {
+                    type:
+                        "text/csv;charset=utf-8;"
+                }
+            );
+
+        const url =
+            URL.createObjectURL(blob);
+
+        const link =
+            document.createElement("a");
+
+        link.href = url;
+
+        link.download =
+            `storesense-inventory-${new Date()
+                .toISOString()
+                .slice(0, 10)}.csv`;
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        link.remove();
+
+        URL.revokeObjectURL(url);
+    }
+
+
+    /* =========================================================
+       STATUS TILE
+       ========================================================= */
+
+    function setStatus(status) {
         state.currentStatus =
             status || "all";
 
-        if (elements.statusFilter) {
-            elements.statusFilter.value =
+        if (el.statusFilter) {
+            el.statusFilter.value =
                 state.currentStatus;
         }
 
-        elements.statusButtons
-            .forEach(button => {
-                button.classList.toggle(
-                    "active",
-                    button.dataset.status ===
-                    state.currentStatus
-                );
-            });
+        el.statusButtons.forEach(button => {
+            button.classList.toggle(
+                "active",
+                button.dataset.status ===
+                state.currentStatus
+            );
+        });
 
         applyFilters();
     }
 
-    function renderStatusCounts() {
-        const counts = {
-            healthy: 0,
-            low: 0,
-            stockout: 0,
-            slow: 0
-        };
 
-        state.inventory.forEach(item => {
-            const status =
-                getInventoryStatus(item);
+    /* =========================================================
+       MODALS
+       ========================================================= */
 
-            if (counts[status] !== undefined) {
-                counts[status]++;
-            }
-        });
-
-        elements.statusButtons
-            .forEach(button => {
-                const status =
-                    button.dataset.status;
-
-                const count =
-                    button.querySelector(
-                        "[data-count]"
-                    );
-
-                if (
-                    count &&
-                    counts[status] !== undefined
-                ) {
-                    count.textContent =
-                        counts[status];
-                }
-            });
+    function closeProductModal() {
+        hide(el.productModal);
     }
 
-    // ---------------------------------------------------------
-    // Events
-    // ---------------------------------------------------------
+
+    /* =========================================================
+       EVENTS
+       ========================================================= */
 
     function bindEvents() {
-        elements.storeFilter?.addEventListener(
+
+        /* -----------------------------------------------------
+           Store filter
+           ----------------------------------------------------- */
+
+        el.storeFilter?.addEventListener(
             "change",
             async () => {
                 try {
                     await loadInventory();
-
-                    state.inventory =
-                        state.inventory.map(
-                            normalizeInventory
-                        );
-
-                    renderEverything();
+                    render();
                 } catch (error) {
-                    console.error(error);
-
-                    setText(
-                        elements.inventoryError,
-                        error.message
+                    console.error(
+                        "Store filter failed:",
+                        error
                     );
 
-                    show(
-                        elements.inventoryError
+                    show(el.errorState);
+
+                    text(
+                        el.errorMessage,
+                        error.message ||
+                        "Unable to load inventory."
                     );
                 }
             }
         );
 
-        elements.searchInput?.addEventListener(
+
+        /* -----------------------------------------------------
+           Search
+           ----------------------------------------------------- */
+
+        el.searchInput?.addEventListener(
             "input",
             applyFilters
         );
 
-        elements.categoryFilter?.addEventListener(
+
+        /* -----------------------------------------------------
+           Category
+           ----------------------------------------------------- */
+
+        el.categoryFilter?.addEventListener(
             "change",
             applyFilters
         );
 
-        elements.statusFilter?.addEventListener(
+
+        /* -----------------------------------------------------
+           Status dropdown
+           ----------------------------------------------------- */
+
+        el.statusFilter?.addEventListener(
             "change",
-            event => {
-                setStatusFilter(
+            event =>
+                setStatus(
                     event.target.value
-                );
-            }
+                )
         );
 
-        elements.sortFilter?.addEventListener(
+
+        /* -----------------------------------------------------
+           Sort
+           ----------------------------------------------------- */
+
+        el.sortFilter?.addEventListener(
             "change",
             applyFilters
         );
 
-        elements.statusButtons
-            .forEach(button => {
-                button.addEventListener(
-                    "click",
-                    () => {
-                        setStatusFilter(
-                            button.dataset.status
-                        );
-                    }
-                );
-            });
 
-        elements.inventoryTableBody
-            ?.addEventListener(
+        /* -----------------------------------------------------
+           Clear filters
+           ----------------------------------------------------- */
+
+        el.clearFilterBtn?.addEventListener(
+            "click",
+            clearFilters
+        );
+
+        el.emptyClearBtn?.addEventListener(
+            "click",
+            clearFilters
+        );
+
+
+        /* -----------------------------------------------------
+           Status cards
+           ----------------------------------------------------- */
+
+        el.statusButtons.forEach(button => {
+            button.addEventListener(
                 "click",
-                event => {
-                    const button =
-                        event.target.closest(
-                            "[data-action='view']"
-                        );
-
-                    if (!button) return;
-
-                    openProductModal(
-                        button.dataset.productId,
-                        button.dataset.storeId
-                    );
-                }
+                () =>
+                    setStatus(
+                        button.dataset.status
+                    )
             );
+        });
 
-        elements.attentionGrid
-            ?.addEventListener(
-                "click",
-                event => {
-                    const card =
-                        event.target.closest(
-                            "[data-alert-product]"
-                        );
 
-                    if (!card) return;
+        /* -----------------------------------------------------
+           Refresh
+           ----------------------------------------------------- */
 
-                    openProductModal(
-                        card.dataset.alertProduct,
-                        card.dataset.alertStore
-                    );
-                }
-            );
-
-        elements.refreshBtn?.addEventListener(
+        el.refreshBtn?.addEventListener(
             "click",
             loadAll
         );
 
-        elements.addStockBtn?.addEventListener(
+
+        /* -----------------------------------------------------
+           Retry
+           ----------------------------------------------------- */
+
+        el.retryBtn?.addEventListener(
             "click",
-            () => openStockModal()
+            loadAll
         );
 
-        elements.saveStockBtn?.addEventListener(
+
+        /* -----------------------------------------------------
+           Add stock
+           ----------------------------------------------------- */
+
+        el.addStockBtn?.addEventListener(
             "click",
-            saveStock
+            () =>
+                openStockModal()
         );
 
-        elements.modalCloseBtn?.addEventListener(
+
+        /* -----------------------------------------------------
+           Export
+           ----------------------------------------------------- */
+
+        el.exportBtn?.addEventListener(
+            "click",
+            exportInventory
+        );
+
+
+        /*
+         * Also support buttons with data-action="export".
+         */
+        document.addEventListener(
+            "click",
+            event => {
+                const button =
+                    event.target.closest(
+                        "[data-action='export']"
+                    );
+
+                if (button) {
+                    exportInventory();
+                }
+            }
+        );
+
+
+        /* -----------------------------------------------------
+           Inventory table
+           ----------------------------------------------------- */
+
+        el.tableBody?.addEventListener(
+            "click",
+            event => {
+                const button =
+                    event.target.closest(
+                        "[data-action='view']"
+                    );
+
+                if (!button) {
+                    return;
+                }
+
+                inspectProduct(
+                    button.dataset.productId,
+                    button.dataset.storeId
+                );
+            }
+        );
+
+
+        /* -----------------------------------------------------
+           Attention cards
+           ----------------------------------------------------- */
+
+        el.attentionGrid?.addEventListener(
+            "click",
+            event => {
+                const card =
+                    event.target.closest(
+                        "[data-alert-product]"
+                    );
+
+                if (!card) {
+                    return;
+                }
+
+                inspectProduct(
+                    card.dataset.alertProduct,
+                    card.dataset.alertStore
+                );
+            }
+        );
+
+
+        /* -----------------------------------------------------
+           Product modal
+           ----------------------------------------------------- */
+
+        el.closeProductModal?.addEventListener(
             "click",
             closeProductModal
         );
 
-        elements.modalActionBtn?.addEventListener(
+        el.modalCloseBtn?.addEventListener(
+            "click",
+            closeProductModal
+        );
+
+
+        /* -----------------------------------------------------
+           Modal action = Add Stock
+           ----------------------------------------------------- */
+
+        el.modalActionBtn?.addEventListener(
             "click",
             () => {
                 const item =
                     state.selectedItem;
 
-                if (!item) return;
+                if (!item) {
+                    return;
+                }
 
                 closeProductModal();
 
                 openStockModal({
-                    storeId: item.store_id,
-                    productId: item.product_id
+                    storeId:
+                        item.store_id,
+
+                    productId:
+                        item.product_id
                 });
             }
         );
 
-        // Close modals when clicking outside.
-        elements.productModal
-            ?.addEventListener(
-                "click",
-                event => {
-                    if (
-                        event.target ===
-                        elements.productModal
-                    ) {
-                        closeProductModal();
-                    }
-                }
-            );
 
-        elements.stockModal
-            ?.addEventListener(
-                "click",
-                event => {
-                    if (
-                        event.target ===
-                        elements.stockModal
-                    ) {
-                        closeStockModal();
-                    }
-                }
-            );
+        /* -----------------------------------------------------
+           Stock modal
+           ----------------------------------------------------- */
 
-        // Escape closes modals.
+        el.closeStockModal?.addEventListener(
+            "click",
+            closeStockModal
+        );
+
+        el.cancelStockBtn?.addEventListener(
+            "click",
+            closeStockModal
+        );
+
+
+        /*
+         * Important:
+         * Handle the form submit itself.
+         * This prevents browser page reload.
+         */
+        el.stockForm?.addEventListener(
+            "submit",
+            event => {
+                event.preventDefault();
+                saveStock();
+            }
+        );
+
+
+        /* -----------------------------------------------------
+           Outside click
+           ----------------------------------------------------- */
+
+        el.productModal?.addEventListener(
+            "click",
+            event => {
+                if (
+                    event.target ===
+                    el.productModal
+                ) {
+                    closeProductModal();
+                }
+            }
+        );
+
+
+        el.stockModal?.addEventListener(
+            "click",
+            event => {
+                if (
+                    event.target ===
+                    el.stockModal
+                ) {
+                    closeStockModal();
+                }
+            }
+        );
+
+
+        /* -----------------------------------------------------
+           Escape
+           ----------------------------------------------------- */
+
         document.addEventListener(
             "keydown",
             event => {
-                if (event.key !== "Escape") {
+                if (
+                    event.key !==
+                    "Escape"
+                ) {
                     return;
                 }
 
@@ -2009,44 +3011,207 @@
                 closeStockModal();
             }
         );
+
+
+        /* -----------------------------------------------------
+           Keyboard shortcut
+           R = refresh
+           ----------------------------------------------------- */
+
+        document.addEventListener(
+            "keydown",
+            event => {
+                if (
+                    event.key.toLowerCase() ===
+                    "r" &&
+
+                    ![
+                        "INPUT",
+                        "TEXTAREA",
+                        "SELECT"
+                    ].includes(
+                        document.activeElement?.tagName
+                    )
+                ) {
+                    loadAll();
+                }
+            }
+        );
     }
 
-    function closeProductModal() {
-        hide(elements.productModal);
+
+    /* =========================================================
+       SIDEBAR LAYOUT SYNC
+       ========================================================= */
+
+    function syncSidebarLayout() {
+        const sidebar =
+            document.getElementById(
+                "storeSidebar"
+            );
+
+        const collapseButton =
+            document.getElementById(
+                "sidebarCollapseButton"
+            );
+
+        if (!sidebar) {
+            return;
+        }
+
+        const collapsed =
+            sidebar.classList.contains(
+                "collapsed"
+            ) ||
+
+            sidebar.classList.contains(
+                "is-collapsed"
+            ) ||
+
+            sidebar.getAttribute(
+                "data-collapsed"
+            ) === "true" ||
+
+            collapseButton?.getAttribute(
+                "aria-expanded"
+            ) === "false";
+
+        document.body.classList.toggle(
+            "sidebar-collapsed",
+            collapsed
+        );
     }
 
-    // ---------------------------------------------------------
-    // Render everything
-    // ---------------------------------------------------------
 
-    function renderEverything() {
+    /* =========================================================
+       WATCH SIDEBAR CHANGES
+       ========================================================= */
+
+    function initializeSidebarLayoutSync() {
+        /*
+         * Sidebar is injected asynchronously.
+         */
+
+        const observer =
+            new MutationObserver(() => {
+                syncSidebarLayout();
+
+                const collapseButton =
+                    document.getElementById(
+                        "sidebarCollapseButton"
+                    );
+
+                if (
+                    collapseButton &&
+                    !collapseButton.dataset
+                        .layoutBound
+                ) {
+                    collapseButton.dataset
+                        .layoutBound = "true";
+
+                    collapseButton.addEventListener(
+                        "click",
+                        () => {
+                            requestAnimationFrame(
+                                () => {
+                                    syncSidebarLayout();
+                                }
+                            );
+                        }
+                    );
+                }
+            });
+
+        observer.observe(
+            document.body,
+            {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: [
+                    "class",
+                    "aria-expanded",
+                    "data-collapsed"
+                ]
+            }
+        );
+
+        syncSidebarLayout();
+    }
+
+
+    /* =========================================================
+       RENDER EVERYTHING
+       ========================================================= */
+
+    function render() {
         renderSummary();
         renderStatusCounts();
         renderAttention();
         applyFilters();
 
+        /*
+         * Keep selected product alive after refresh.
+         */
         if (state.selectedItem) {
             const updated =
-                state.inventory.find(
-                    item =>
-                        item.product_id ===
-                        state.selectedItem.product_id &&
-                        item.store_id ===
-                        state.selectedItem.store_id
+                findInventoryItem(
+                    state.selectedItem.product_id,
+                    state.selectedItem.store_id
                 );
 
             if (updated) {
                 state.selectedItem =
                     updated;
 
-                renderMovement(updated);
+                renderMovement(
+                    updated
+                );
             }
         }
     }
+    function populateStockStores() {
 
-    // ---------------------------------------------------------
-    // Initialization
-    // ---------------------------------------------------------
+    if (!el.stockStore) {
+        return;
+    }
+
+    const current = el.stockStore.value;
+
+    el.stockStore.innerHTML =
+        `<option value="">Select store</option>`;
+
+    state.stores.forEach(store => {
+
+        const id = getStoreId(store);
+
+        if (!id) {
+            return;
+        }
+
+        const option =
+            document.createElement("option");
+
+        option.value = id;
+
+        option.textContent =
+            getStoreName(store);
+
+        el.stockStore.appendChild(option);
+
+    });
+
+    if (
+        [...el.stockStore.options]
+            .some(option => option.value === current)
+    ) {
+        el.stockStore.value = current;
+    }
+}
+
+    /* =========================================================
+       INITIALIZATION
+       ========================================================= */
 
     async function init() {
         console.log(
@@ -2055,20 +3220,31 @@
 
         bindEvents();
 
-        // Initial state
         state.currentStatus = "all";
 
-        if (elements.statusFilter) {
-            elements.statusFilter.value =
-                "all";
+        if (el.statusFilter) {
+            el.statusFilter.value = "all";
         }
 
+        el.statusButtons.forEach(button => {
+            button.classList.toggle(
+                "active",
+                button.dataset.status === "all"
+            );
+        });
+
         renderMovement(null);
+
+        initializeSidebarLayoutSync();
 
         await loadAll();
     }
 
-    // Start only after DOM is ready.
+
+    /* =========================================================
+       START
+       ========================================================= */
+
     if (
         document.readyState ===
         "loading"
