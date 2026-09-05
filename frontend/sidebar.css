@@ -1,0 +1,1321 @@
+/* =========================================================
+   STORESENSE
+   SHARED SIDEBAR
+   Cream / Black / Antique Gold
+   ========================================================= */
+
+
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+:root {
+
+    --sidebar-width: 258px;
+    --sidebar-collapsed-width: 76px;
+
+    --sidebar-black: #111111;
+    --sidebar-black-soft: #171715;
+    --sidebar-black-hover: #1d1c19;
+
+    --sidebar-cream: #f5f1e8;
+    --sidebar-paper: #faf8f2;
+
+    --sidebar-gold: #b08a3c;
+    --sidebar-gold-light: #d0b06a;
+    --sidebar-gold-dark: #8d6c2d;
+
+    --sidebar-white: #ffffff;
+
+    --sidebar-text: #b6b2a9;
+    --sidebar-text-light: #ddd9d0;
+    --sidebar-muted: #77736b;
+    --sidebar-muted-dark: #55524c;
+
+    --sidebar-border: #2e2d29;
+    --sidebar-border-light: #3a3832;
+
+    --sidebar-status: #738c5d;
+
+    --sidebar-transition: 220ms ease;
+}
+
+
+/* =========================================================
+   BASE
+   ========================================================= */
+
+.sidebar,
+.sidebar *,
+.mobile-sidebar-header,
+.mobile-sidebar-header * {
+
+    box-sizing: border-box;
+
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+
+    position: fixed;
+
+    top: 0;
+    left: 0;
+    bottom: 0;
+
+    z-index: 1000;
+
+    width: var(--sidebar-width);
+
+    display: flex;
+
+    flex-direction: column;
+
+    background: var(--sidebar-black);
+
+    border-right: 1px solid #292824;
+
+    overflow: hidden;
+
+    transition:
+        width var(--sidebar-transition),
+        transform var(--sidebar-transition);
+
+}
+
+
+/* =========================================================
+   BRAND AREA
+   ========================================================= */
+
+.sidebar-brand {
+
+    min-height: 88px;
+
+    padding: 18px 14px 18px 17px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    border-bottom: 1px solid var(--sidebar-border);
+
+}
+
+
+/* =========================================================
+   BRAND LINK
+   ========================================================= */
+
+.sidebar-brand-link {
+
+    min-width: 0;
+
+    flex: 1;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 11px;
+
+    color: inherit;
+
+    text-decoration: none;
+
+}
+
+
+/* =========================================================
+   LOGO
+   ========================================================= */
+
+.sidebar-logo {
+
+    width: 40px;
+    height: 40px;
+
+    flex: 0 0 40px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--sidebar-gold);
+
+    color: var(--sidebar-gold-light);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 18px;
+
+    font-weight: 600;
+
+    letter-spacing: 0.02em;
+
+}
+
+
+/* =========================================================
+   BRAND TEXT
+   ========================================================= */
+
+.sidebar-brand-text {
+
+    min-width: 0;
+
+    overflow: hidden;
+
+}
+
+
+.sidebar-brand-name {
+
+    color: var(--sidebar-white);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 19px;
+
+    font-weight: 500;
+
+    line-height: 1.1;
+
+    white-space: nowrap;
+
+}
+
+
+.sidebar-brand-subtitle {
+
+    margin-top: 5px;
+
+    color: var(--sidebar-muted);
+
+    font-size: 8px;
+
+    font-weight: 800;
+
+    line-height: 1;
+
+    letter-spacing: 0.15em;
+
+    text-transform: uppercase;
+
+    white-space: nowrap;
+
+}
+
+
+/* =========================================================
+   COLLAPSE BUTTON
+   ========================================================= */
+
+.sidebar-collapse-button {
+
+    width: 30px;
+    height: 30px;
+
+    flex: 0 0 30px;
+
+    padding: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--sidebar-border-light);
+
+    background: transparent;
+
+    color: var(--sidebar-text);
+
+    cursor: pointer;
+
+    transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        color 160ms ease;
+
+}
+
+
+.sidebar-collapse-button:hover {
+
+    background: var(--sidebar-black-hover);
+
+    border-color: var(--sidebar-gold-dark);
+
+    color: var(--sidebar-gold-light);
+
+}
+
+
+.sidebar-collapse-icon {
+
+    display: block;
+
+    font-family:
+        Arial,
+        sans-serif;
+
+    font-size: 23px;
+
+    font-weight: 300;
+
+    line-height: 1;
+
+    transform: translateX(-1px);
+
+    transition:
+        transform var(--sidebar-transition);
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+.sidebar-navigation {
+
+    flex: 1;
+
+    min-height: 0;
+
+    padding: 24px 11px;
+
+    overflow-x: hidden;
+
+    overflow-y: auto;
+
+}
+
+
+/* =========================================================
+   SECTION
+   ========================================================= */
+
+.sidebar-section {
+
+    margin-bottom: 27px;
+
+}
+
+
+.sidebar-section:last-child {
+
+    margin-bottom: 0;
+
+}
+
+
+/* =========================================================
+   SECTION LABEL
+   ========================================================= */
+
+.sidebar-section-label {
+
+    padding:
+
+        0 10px 9px;
+
+    color: var(--sidebar-muted-dark);
+
+    font-size: 8px;
+
+    font-weight: 800;
+
+    line-height: 1;
+
+    letter-spacing: 0.19em;
+
+    text-transform: uppercase;
+
+    white-space: nowrap;
+
+}
+
+
+/* =========================================================
+   NAVIGATION ITEM
+   ========================================================= */
+
+.sidebar-nav-item {
+
+    position: relative;
+
+    min-height: 45px;
+
+    margin-bottom: 3px;
+
+    padding: 10px 10px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    color: var(--sidebar-text);
+
+    border: 1px solid transparent;
+
+    text-decoration: none;
+
+    transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        color 160ms ease;
+
+}
+
+
+/* =========================================================
+   NAV HOVER
+   ========================================================= */
+
+.sidebar-nav-item:hover {
+
+    color: var(--sidebar-white);
+
+    background: var(--sidebar-black-hover);
+
+    border-color: var(--sidebar-border);
+
+}
+
+
+/* =========================================================
+   ACTIVE ITEM
+   ========================================================= */
+
+.sidebar-nav-item.active {
+
+    color: var(--sidebar-white);
+
+    background: #211f1a;
+
+    border-color: #49402e;
+
+}
+
+
+/* GOLD ACTIVE BAR */
+
+.sidebar-nav-item.active::before {
+
+    content: "";
+
+    position: absolute;
+
+    top: -1px;
+    bottom: -1px;
+
+    left: -1px;
+
+    width: 3px;
+
+    background: var(--sidebar-gold);
+
+}
+
+
+/* =========================================================
+   NAV ICON
+   ========================================================= */
+
+.sidebar-nav-icon {
+
+    width: 26px;
+    height: 24px;
+
+    flex: 0 0 26px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    color: var(--sidebar-gold-light);
+
+    font-size: 17px;
+
+    line-height: 1;
+
+}
+
+
+.sidebar-nav-item:hover .sidebar-nav-icon {
+
+    color: var(--sidebar-gold-light);
+
+}
+
+
+.sidebar-nav-item.active .sidebar-nav-icon {
+
+    color: var(--sidebar-gold-light);
+
+}
+
+
+/* =========================================================
+   INDIVIDUAL ICON TUNING
+   ========================================================= */
+
+.icon-dashboard {
+
+    font-size: 19px;
+
+}
+
+
+.icon-data {
+
+    font-size: 18px;
+
+}
+
+
+.icon-inventory {
+
+    font-size: 21px;
+
+    font-weight: 300;
+
+}
+
+
+.icon-copilot {
+
+    font-size: 18px;
+
+}
+
+
+/* =========================================================
+   NAV TEXT
+   ========================================================= */
+
+.sidebar-nav-text {
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    color: inherit;
+
+    font-size: 11px;
+
+    font-weight: 650;
+
+    line-height: 1;
+
+    white-space: nowrap;
+
+}
+
+
+/* =========================================================
+   SIDEBAR FOOTER
+   ========================================================= */
+
+.sidebar-footer {
+
+    padding: 14px 13px 17px;
+
+    border-top: 1px solid var(--sidebar-border);
+
+}
+
+
+/* =========================================================
+   STATUS CARD
+   ========================================================= */
+
+.sidebar-status-card {
+
+    min-height: 57px;
+
+    padding: 11px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    background: var(--sidebar-black-soft);
+
+    border: 1px solid var(--sidebar-border);
+
+}
+
+
+/* =========================================================
+   STATUS DOT
+   ========================================================= */
+
+.sidebar-status-dot {
+
+    width: 8px;
+    height: 8px;
+
+    flex: 0 0 8px;
+
+    border-radius: 50%;
+
+    background: var(--sidebar-status);
+
+    box-shadow:
+        0 0 0 4px rgba(115, 140, 93, 0.09);
+
+}
+
+
+/* =========================================================
+   STATUS CONTENT
+   ========================================================= */
+
+.sidebar-status-content {
+
+    min-width: 0;
+
+    overflow: hidden;
+
+}
+
+
+.sidebar-status-title {
+
+    color: var(--sidebar-text-light);
+
+    font-size: 9px;
+
+    font-weight: 750;
+
+    line-height: 1.2;
+
+    white-space: nowrap;
+
+}
+
+
+.sidebar-status-text {
+
+    margin-top: 4px;
+
+    color: var(--sidebar-muted);
+
+    font-size: 8px;
+
+    line-height: 1.2;
+
+    white-space: nowrap;
+
+}
+
+
+/* =========================================================
+   POWERED TEXT
+   ========================================================= */
+
+.sidebar-powered {
+
+    margin-top: 11px;
+
+    color: var(--sidebar-muted-dark);
+
+    font-size: 7px;
+
+    font-weight: 700;
+
+    line-height: 1;
+
+    letter-spacing: 0.12em;
+
+    text-align: center;
+
+    text-transform: uppercase;
+
+    white-space: nowrap;
+
+}
+
+
+/* =========================================================
+   COLLAPSED DESKTOP SIDEBAR
+   ========================================================= */
+
+body.sidebar-collapsed .sidebar {
+
+    width: var(--sidebar-collapsed-width);
+
+}
+
+
+/* =========================================================
+   COLLAPSED BRAND
+   ========================================================= */
+
+body.sidebar-collapsed .sidebar-brand {
+
+    padding-left: 11px;
+    padding-right: 11px;
+
+    justify-content: center;
+
+}
+
+
+body.sidebar-collapsed .sidebar-brand-link {
+
+    flex: 0 0 auto;
+
+}
+
+
+body.sidebar-collapsed .sidebar-brand-text {
+
+    display: none;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-collapse-button {
+
+    position: absolute;
+
+    right: 10px;
+
+    top: 55px;
+
+    width: 24px;
+    height: 24px;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-collapse-icon {
+
+    transform:
+        rotate(180deg)
+        translateX(1px);
+
+}
+
+
+/* =========================================================
+   COLLAPSED NAV
+   ========================================================= */
+
+body.sidebar-collapsed
+.sidebar-navigation {
+
+    padding-left: 10px;
+    padding-right: 10px;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-section-label {
+
+    visibility: hidden;
+
+    height: 12px;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-nav-item {
+
+    justify-content: center;
+
+    padding-left: 5px;
+    padding-right: 5px;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-nav-text {
+
+    display: none;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-nav-icon {
+
+    width: 30px;
+
+    flex-basis: 30px;
+
+}
+
+
+/* =========================================================
+   COLLAPSED FOOTER
+   ========================================================= */
+
+body.sidebar-collapsed
+.sidebar-status-card {
+
+    min-height: 47px;
+
+    padding: 10px 5px;
+
+    justify-content: center;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-status-content {
+
+    display: none;
+
+}
+
+
+body.sidebar-collapsed
+.sidebar-powered {
+
+    display: none;
+
+}
+
+
+/* =========================================================
+   OPTIONAL MAIN CONTENT SUPPORT
+   ========================================================= */
+
+/*
+   Add class="main-content" to the main content
+   container on pages using this sidebar.
+*/
+
+.main-content {
+
+    margin-left: var(--sidebar-width);
+
+    min-height: 100vh;
+
+    transition:
+        margin-left var(--sidebar-transition);
+
+}
+
+
+body.sidebar-collapsed .main-content {
+
+    margin-left: var(--sidebar-collapsed-width);
+
+}
+
+
+/* =========================================================
+   MOBILE HEADER
+   ========================================================= */
+
+.mobile-sidebar-header {
+
+    display: none;
+
+}
+
+
+/* =========================================================
+   MOBILE OVERLAY
+   ========================================================= */
+
+.sidebar-overlay {
+
+    display: none;
+
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+
+    /* -----------------------------------------------
+       SIDEBAR
+       ----------------------------------------------- */
+
+    .sidebar {
+
+        width: min(285px, 86vw);
+
+        transform: translateX(-100%);
+
+        box-shadow:
+            18px 0 45px rgba(0, 0, 0, 0.24);
+
+    }
+
+
+    body.sidebar-mobile-open .sidebar {
+
+        transform: translateX(0);
+
+    }
+
+
+    /* -----------------------------------------------
+       Disable desktop collapse
+       ----------------------------------------------- */
+
+    .sidebar-collapse-button {
+
+        display: none;
+
+    }
+
+
+    body.sidebar-collapsed .sidebar {
+
+        width: min(285px, 86vw);
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-brand-text {
+
+        display: block;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-brand {
+
+        justify-content: flex-start;
+
+        padding-left: 17px;
+        padding-right: 14px;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-nav-text {
+
+        display: block;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-nav-item {
+
+        justify-content: flex-start;
+
+        padding-left: 10px;
+        padding-right: 10px;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-nav-icon {
+
+        width: 26px;
+
+        flex-basis: 26px;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-section-label {
+
+        visibility: visible;
+
+        height: auto;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-status-content {
+
+        display: block;
+
+    }
+
+
+    body.sidebar-collapsed
+    .sidebar-powered {
+
+        display: block;
+
+    }
+
+
+    /* -----------------------------------------------
+       MAIN CONTENT
+       ----------------------------------------------- */
+
+    .main-content,
+    body.sidebar-collapsed .main-content {
+
+        margin-left: 0;
+
+        padding-top: 67px;
+
+    }
+
+
+    /* -----------------------------------------------
+       MOBILE HEADER
+       ----------------------------------------------- */
+
+    .mobile-sidebar-header {
+
+        position: fixed;
+
+        top: 0;
+        left: 0;
+        right: 0;
+
+        z-index: 800;
+
+        height: 67px;
+
+        padding: 10px 14px;
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 12px;
+
+        background: var(--sidebar-black);
+
+        border-bottom: 1px solid var(--sidebar-border);
+
+    }
+
+
+    /* -----------------------------------------------
+       MOBILE MENU BUTTON
+       ----------------------------------------------- */
+
+    .mobile-sidebar-toggle {
+
+        width: 43px;
+        height: 43px;
+
+        flex: 0 0 43px;
+
+        padding: 0;
+
+        display: flex;
+
+        flex-direction: column;
+
+        align-items: center;
+        justify-content: center;
+
+        gap: 5px;
+
+        background: transparent;
+
+        border: 1px solid var(--sidebar-border-light);
+
+        cursor: pointer;
+
+    }
+
+
+    .mobile-sidebar-toggle:hover {
+
+        border-color: var(--sidebar-gold-dark);
+
+    }
+
+
+    .mobile-sidebar-toggle span {
+
+        display: block;
+
+        width: 18px;
+        height: 1px;
+
+        background: var(--sidebar-text-light);
+
+        transition:
+            transform 180ms ease,
+            opacity 180ms ease;
+
+    }
+
+
+    /* -----------------------------------------------
+       HAMBURGER → X
+       ----------------------------------------------- */
+
+    body.sidebar-mobile-open
+    .mobile-sidebar-toggle
+    span:nth-child(1) {
+
+        transform:
+            translateY(6px)
+            rotate(45deg);
+
+    }
+
+
+    body.sidebar-mobile-open
+    .mobile-sidebar-toggle
+    span:nth-child(2) {
+
+        opacity: 0;
+
+    }
+
+
+    body.sidebar-mobile-open
+    .mobile-sidebar-toggle
+    span:nth-child(3) {
+
+        transform:
+            translateY(-6px)
+            rotate(-45deg);
+
+    }
+
+
+    /* -----------------------------------------------
+       MOBILE BRAND
+       ----------------------------------------------- */
+
+    .mobile-sidebar-brand {
+
+        display: flex;
+
+        align-items: center;
+
+        gap: 9px;
+
+        color: inherit;
+
+        text-decoration: none;
+
+    }
+
+
+    .mobile-sidebar-logo {
+
+        width: 32px;
+        height: 32px;
+
+        flex: 0 0 32px;
+
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        border: 1px solid var(--sidebar-gold);
+
+        color: var(--sidebar-gold-light);
+
+        font-family:
+            Georgia,
+            "Times New Roman",
+            serif;
+
+        font-size: 15px;
+
+    }
+
+
+    .mobile-sidebar-brand-text {
+
+        display: flex;
+
+        flex-direction: column;
+
+    }
+
+
+    .mobile-sidebar-brand-name {
+
+        color: var(--sidebar-white);
+
+        font-family:
+            Georgia,
+            "Times New Roman",
+            serif;
+
+        font-size: 16px;
+
+        line-height: 1.1;
+
+    }
+
+
+    .mobile-sidebar-brand-subtitle {
+
+        margin-top: 3px;
+
+        color: var(--sidebar-muted);
+
+        font-size: 6px;
+
+        font-weight: 800;
+
+        line-height: 1;
+
+        letter-spacing: 0.14em;
+
+        text-transform: uppercase;
+
+    }
+
+
+    /* -----------------------------------------------
+       OVERLAY
+       ----------------------------------------------- */
+
+    .sidebar-overlay {
+
+        position: fixed;
+
+        inset: 0;
+
+        z-index: 900;
+
+        display: block;
+
+        background: rgba(0, 0, 0, 0.52);
+
+        visibility: hidden;
+
+        opacity: 0;
+
+        pointer-events: none;
+
+        transition:
+            opacity 180ms ease,
+            visibility 180ms ease;
+
+    }
+
+
+    body.sidebar-mobile-open .sidebar-overlay {
+
+        visibility: visible;
+
+        opacity: 1;
+
+        pointer-events: auto;
+
+    }
+
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 420px) {
+
+    .mobile-sidebar-header {
+
+        height: 62px;
+
+        padding: 9px 11px;
+
+    }
+
+
+    .mobile-sidebar-toggle {
+
+        width: 40px;
+        height: 40px;
+
+        flex-basis: 40px;
+
+    }
+
+
+    .main-content,
+    body.sidebar-collapsed .main-content {
+
+        padding-top: 62px;
+
+    }
+
+
+    .sidebar {
+
+        width: 84vw;
+
+    }
+
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+.sidebar-nav-item:focus-visible,
+.sidebar-collapse-button:focus-visible,
+.mobile-sidebar-toggle:focus-visible,
+.sidebar-brand-link:focus-visible,
+.mobile-sidebar-brand:focus-visible {
+
+    outline: 1px solid var(--sidebar-gold-light);
+
+    outline-offset: 2px;
+
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .sidebar,
+    .sidebar-collapse-icon,
+    .main-content,
+    .mobile-sidebar-toggle span,
+    .sidebar-overlay {
+
+        transition: none;
+
+    }
+
+}

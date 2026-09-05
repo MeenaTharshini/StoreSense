@@ -1,0 +1,1805 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="description"
+        content="StoreSense - Retail Sales and Inventory Copilot"
+    >
+
+    <title>StoreSense | Retail Intelligence</title>
+
+
+    <!-- SHARED SIDEBAR -->
+    <link
+        rel="stylesheet"
+        href="/static/sidebar.css"
+    >
+
+    <!-- DASHBOARD -->
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<div class="app-shell">
+
+
+    <!-- =====================================================
+         SHARED SIDEBAR
+         Loaded from sidebar.html
+         ===================================================== -->
+
+    <div id="sharedSidebar"></div>
+
+
+
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
+
+    <main class="main-content">
+
+
+        <!-- =================================================
+             TOP BAR
+             ================================================= -->
+
+        <header class="topbar">
+
+            <div>
+
+                <div class="breadcrumb">
+                    Workspace / Dashboard
+                </div>
+
+
+                <h1>
+                    Good day!
+                </h1>
+
+
+                <p class="top-description">
+                    Here's what needs your attention across
+                    your stores.
+                </p>
+
+            </div>
+
+
+            <div class="top-actions">
+
+
+                <div
+                    class="connection-status"
+                    id="status"
+                >
+
+                    <span class="status-dot"></span>
+
+                    Connecting...
+
+                </div>
+
+
+                <a
+                    href="/data-center"
+                    class="primary-button"
+                >
+
+                    <span>
+                        ＋
+                    </span>
+
+                    Update Data
+
+                </a>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- =================================================
+             KPI SECTION
+             ================================================= -->
+
+        <section
+            class="kpi-grid"
+            id="summary"
+        >
+
+            <!--
+                app.js renders KPI cards here.
+            -->
+
+        </section>
+       
+
+        <!-- =================================================
+             ATTENTION SUMMARY
+             ================================================= -->
+
+        <section class="attention-summary">
+
+
+            <div class="attention-summary-card">
+
+                <span
+                    class="attention-summary-number"
+                    id="issueCount"
+                >
+                    —
+                </span>
+
+                <span class="attention-summary-label">
+                    Issues
+                </span>
+
+            </div>
+
+
+
+            <div class="attention-summary-card">
+
+                <span
+                    class="attention-summary-number"
+                    id="signalCount"
+                >
+                    —
+                </span>
+
+                <span class="attention-summary-label">
+                    Signals
+                </span>
+
+            </div>
+
+
+
+            <div class="attention-summary-card">
+
+                <span
+                    class="attention-summary-number"
+                    id="highPriorityCount"
+                >
+                    —
+                </span>
+
+                <span class="attention-summary-label">
+                    High priority
+                </span>
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             ATTENTION CONTENT
+             ================================================= -->
+
+        <section class="attention-container">
+
+            <div id="attentionList">
+
+    <div class="loading-state">
+        <div class="loader-spinner"></div>
+
+        <div class="loader-content">
+            <strong>Analyzing your retail data</strong>
+            <span>Checking inventory, sales trends, and priority signals...</span>
+        </div>
+    </div>
+
+</div>
+
+        </section>
+
+ <!-- =========================================================
+     BUSINESS PERFORMANCE
+     ========================================================= -->
+
+<section class="performance-section" id="performance">
+
+    <div class="performance-header">
+
+        <div>
+            <div class="section-kicker">
+                BUSINESS PERFORMANCE
+            </div>
+
+            <h2>
+                Sales & Inventory Overview
+            </h2>
+
+            <p>
+                Track recent sales performance and inventory
+                health across your retail workspace.
+            </p>
+        </div>
+
+        <div class="performance-period">
+            Last 30 days
+        </div>
+
+    </div>
+
+
+    <div class="performance-grid">
+
+
+        <!-- =================================================
+             REVENUE TREND
+             ================================================= -->
+
+        <div class="chart-card revenue-card">
+
+            <div class="chart-card-header">
+
+                <div>
+
+                    <span class="chart-label">
+                        REVENUE TREND
+                    </span>
+
+                    <h3 id="chartRevenue">
+                        ₹0
+                    </h3>
+
+                </div>
+
+                <div
+                    class="chart-change"
+                    id="revenueChange"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="chart-wrapper">
+
+                <svg
+                    id="revenueChart"
+                    viewBox="0 0 700 260"
+                    preserveAspectRatio="none"
+                    role="img"
+                    aria-label="Revenue trend for the last 30 days"
+                >
+
+                    <defs>
+
+                        <linearGradient
+                            id="revenueGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                        >
+
+                            <stop
+                                offset="0%"
+                                stop-opacity="0.22"
+                            />
+
+                            <stop
+                                offset="100%"
+                                stop-opacity="0"
+                            />
+
+                        </linearGradient>
+
+                    </defs>
+
+
+                    <!-- GRID -->
+
+                    <line
+                        x1="0"
+                        y1="45"
+                        x2="700"
+                        y2="45"
+                        class="chart-grid-line"
+                    />
+
+                    <line
+                        x1="0"
+                        y1="105"
+                        x2="700"
+                        y2="105"
+                        class="chart-grid-line"
+                    />
+
+                    <line
+                        x1="0"
+                        y1="165"
+                        x2="700"
+                        y2="165"
+                        class="chart-grid-line"
+                    />
+
+                    <line
+                        x1="0"
+                        y1="225"
+                        x2="700"
+                        y2="225"
+                        class="chart-grid-line"
+                    />
+
+
+                    <!-- AREA -->
+
+                    <path
+                        id="revenueArea"
+                        class="revenue-area"
+                        d=""
+                    />
+
+
+                    <!-- LINE -->
+
+                    <path
+                        id="revenueLine"
+                        class="revenue-line"
+                        d=""
+                    />
+
+
+                    <!-- POINTS -->
+
+                    <g id="revenuePoints"></g>
+
+                </svg>
+
+            </div>
+
+
+            <div
+                class="chart-axis"
+                id="revenueAxis"
+            >
+            </div>
+
+        </div>
+
+
+
+        <!-- =================================================
+             INVENTORY HEALTH
+             ================================================= -->
+
+        <div class="chart-card inventory-health-card">
+
+            <div class="chart-card-header">
+
+                <div>
+
+                    <span class="chart-label">
+                        INVENTORY HEALTH
+                    </span>
+
+                    <h3>
+                        Stock overview
+                    </h3>
+
+                </div>
+
+                <span class="live-badge">
+                    <span></span>
+                    Live
+                </span>
+
+            </div>
+
+
+            <div
+                class="inventory-total"
+                id="inventoryTotal"
+            >
+                —
+            </div>
+
+
+            <div class="inventory-bar">
+
+                <div
+                    id="healthyBar"
+                    class="inventory-segment healthy"
+                ></div>
+
+                <div
+                    id="lowStockBar"
+                    class="inventory-segment low"
+                ></div>
+
+                <div
+                    id="stockoutBar"
+                    class="inventory-segment critical"
+                ></div>
+
+                <div
+                    id="slowMovingBar"
+                    class="inventory-segment slow"
+                ></div>
+
+            </div>
+
+
+            <div class="inventory-legend">
+
+                <div class="inventory-item">
+
+                    <span class="inventory-dot healthy"></span>
+
+                    <div>
+                        <strong>Healthy</strong>
+                        <span id="healthyCount">—</span>
+                    </div>
+
+                </div>
+
+
+                <div class="inventory-item">
+
+                    <span class="inventory-dot low"></span>
+
+                    <div>
+                        <strong>Low stock</strong>
+                        <span id="lowStockCount">—</span>
+                    </div>
+
+                </div>
+
+
+                <div class="inventory-item">
+
+                    <span class="inventory-dot critical"></span>
+
+                    <div>
+                        <strong>Stock-out risk</strong>
+                        <span id="stockoutCount">—</span>
+                    </div>
+
+                </div>
+
+
+                <div class="inventory-item">
+
+                    <span class="inventory-dot slow"></span>
+
+                    <div>
+                        <strong>Slow-moving</strong>
+                        <span id="slowMovingCount">—</span>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+        <!-- =================================================
+             AI COPILOT
+             ================================================= -->
+
+        <section
+            class="copilot-section"
+            id="copilot"
+        >
+
+
+            <!-- COPILOT HEADER -->
+
+            <div class="copilot-header">
+
+
+                <div class="copilot-title-area">
+
+
+                    <div class="copilot-icon">
+                        ✦
+                    </div>
+
+
+                    <div>
+
+                        <div class="section-kicker">
+                            AI ASSISTANT
+                        </div>
+
+
+                        <h2>
+                            Ask StoreSense
+                        </h2>
+
+
+                        <p>
+                            Ask questions about sales,
+                            inventory, products, and stores
+                            using your actual business data.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="ai-badge">
+                    Gemini
+                </div>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 QUICK QUESTIONS
+                 ================================================= -->
+
+            <div class="quick-questions">
+
+
+                <button
+                    type="button"
+                    onclick="ask('What needs attention today?')"
+                >
+
+                    <span>
+                        ⚠
+                    </span>
+
+                    What needs attention?
+
+                </button>
+
+
+
+                <button
+                    type="button"
+                    onclick="ask('What is running out?')"
+                >
+
+                    <span>
+                        □
+                    </span>
+
+                    What's running out?
+
+                </button>
+
+
+
+                <button
+                    type="button"
+                    onclick="ask('Which products are selling the most?')"
+                >
+
+                    <span>
+                        ↗
+                    </span>
+
+                    Best sellers
+
+                </button>
+
+
+
+                <button
+                    type="button"
+                    onclick="ask('Which products have sales drops?')"
+                >
+
+                    <span>
+                        ↓
+                    </span>
+
+                    Sales drops
+
+                </button>
+
+
+
+                <button
+                    type="button"
+                    onclick="ask('Which products are overstocked?')"
+                >
+
+                    <span>
+                        ◈
+                    </span>
+
+                    Overstock
+
+                </button>
+
+
+
+                <button
+                    type="button"
+                    onclick="ask('Which products are not moving?')"
+                >
+
+                    <span>
+                        ○
+                    </span>
+
+                    Non-moving stock
+
+                </button>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 QUESTION BOX
+                 ================================================= -->
+
+            <div class="question-area">
+
+
+                <textarea
+                    id="question"
+                    rows="2"
+                    placeholder="Ask StoreSense anything about your retail business..."
+                    onkeydown="handleQuestionKey(event)"
+                ></textarea>
+
+
+                <button
+                    class="ask-button"
+                    type="button"
+                    onclick="sendQuestion()"
+                    aria-label="Ask StoreSense"
+                >
+
+                    <span>
+                        Ask StoreSense
+                    </span>
+
+
+                    <span class="ask-arrow">
+                        →
+                    </span>
+
+                </button>
+
+
+            </div>
+
+
+
+            <!-- =================================================
+                 ANSWER
+                 ================================================= -->
+
+            <div
+                id="answer"
+                class="answer"
+            >
+
+
+                <div class="empty-copilot">
+
+
+                    <div class="empty-icon">
+                        ✦
+                    </div>
+
+
+                    <h3>
+                        Your retail copilot is ready.
+                    </h3>
+
+
+                    <p>
+                        Ask a question above and StoreSense
+                        will analyze your sales and inventory
+                        evidence.
+                    </p>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             FOOTER
+             ================================================= -->
+
+        <footer class="footer">
+
+            <div>
+                StoreSense · Retail Sales & Inventory Copilot
+            </div>
+
+            <div>
+                Evidence-backed intelligence
+            </div>
+
+        </footer>
+
+
+    </main>
+
+</div>
+
+
+
+<!-- =========================================================
+     EVIDENCE MODAL
+     ========================================================= -->
+
+<div
+    id="modal"
+    class="modal hidden"
+>
+
+
+    <div
+        class="modal-overlay"
+        onclick="closeModal()"
+    ></div>
+
+
+    <div class="modal-box">
+
+
+        <button
+            class="close"
+            type="button"
+            onclick="closeModal()"
+            aria-label="Close"
+        >
+            ×
+        </button>
+
+
+        <div class="modal-header">
+
+
+            <div class="modal-icon">
+                🔍
+            </div>
+
+
+            <div>
+
+                <div class="section-kicker">
+                    VERIFIED DATA
+                </div>
+
+
+                <h2>
+                    Evidence
+                </h2>
+
+
+                <p>
+                    Source data behind this StoreSense alert.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div id="modalContent"></div>
+
+
+    </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     SHARED SIDEBAR LOADER
+     ========================================================= -->
+
+<script>
+
+async function loadSidebar() {
+
+    try {
+
+        const response =
+            await fetch("/static/sidebar.html");
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Unable to load sidebar."
+            );
+
+        }
+
+        const html =
+            await response.text();
+
+        const container =
+            document.getElementById(
+                "sharedSidebar"
+            );
+
+        container.innerHTML = html;
+
+
+        /*
+         * sidebar.js initializes:
+         * - collapse
+         * - mobile drawer
+         * - active page
+         * - overlay
+         */
+
+        if (
+            typeof initializeSidebar === "function"
+        ) {
+
+            initializeSidebar();
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Sidebar loading failed:",
+            error
+        );
+
+    }
+
+}
+
+
+loadSidebar();
+
+</script>
+
+
+
+<!-- =========================================================
+     DASHBOARD JAVASCRIPT
+     ========================================================= -->
+
+<script src="/static/app.js"></script>
+<script>
+
+/* =========================================================
+   BUSINESS PERFORMANCE
+   ========================================================= */
+
+async function loadPerformance() {
+
+    try {
+
+        const response = await fetch(
+            "/api/performance"
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to load performance data."
+            );
+        }
+
+        const data = await response.json();
+
+        if (!data.ok) {
+            throw new Error(
+                "Performance data unavailable."
+            );
+        }
+
+        renderRevenueChart(
+            data.revenue || []
+        );
+
+        renderInventoryHealth(
+            data.inventory || {}
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Performance loading failed:",
+            error
+        );
+
+        showPerformanceFallback();
+
+    }
+}
+
+
+/* =========================================================
+   REVENUE CHART
+   ========================================================= */
+
+function renderRevenueChart(rows) {
+
+    const line =
+        document.getElementById(
+            "revenueLine"
+        );
+
+    const area =
+        document.getElementById(
+            "revenueArea"
+        );
+
+    const points =
+        document.getElementById(
+            "revenuePoints"
+        );
+
+    const axis =
+        document.getElementById(
+            "revenueAxis"
+        );
+
+    const revenueValue =
+        document.getElementById(
+            "chartRevenue"
+        );
+
+    if (
+        !line ||
+        !area ||
+        !points
+    ) {
+        return;
+    }
+
+
+    if (!rows.length) {
+
+        line.setAttribute(
+            "d",
+            ""
+        );
+
+        area.setAttribute(
+            "d",
+            ""
+        );
+
+        revenueValue.textContent =
+            "₹0";
+
+        return;
+    }
+
+
+    const values = rows.map(
+        row => Number(
+            row.revenue || 0
+        )
+    );
+
+
+    const total = values.reduce(
+        (sum, value) =>
+            sum + value,
+        0
+    );
+
+
+    revenueValue.textContent =
+        formatCurrency(total);
+
+
+    const width = 700;
+    const height = 225;
+
+    const paddingX = 8;
+
+    const max =
+        Math.max(...values, 1);
+
+    const min =
+        Math.min(...values, 0);
+
+
+    const range =
+        Math.max(max - min, 1);
+
+
+    const step =
+        values.length > 1
+            ? (width - paddingX * 2)
+              / (values.length - 1)
+            : 0;
+
+
+    const coords = values.map(
+        (value, index) => {
+
+            const x =
+                paddingX +
+                index * step;
+
+            const y =
+                225 -
+                (
+                    (value - min)
+                    / range
+                ) * 180;
+
+            return {
+                x,
+                y
+            };
+
+        }
+    );
+
+
+    const path = coords
+        .map(
+            (point, index) =>
+                `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`
+        )
+        .join(" ");
+
+
+    const areaPath =
+        `${path} L ${coords[coords.length - 1].x} 225 L ${coords[0].x} 225 Z`;
+
+
+    line.setAttribute(
+        "d",
+        path
+    );
+
+    area.setAttribute(
+        "d",
+        areaPath
+    );
+
+
+    points.innerHTML =
+        coords.map(
+            point => `
+                <circle
+                    class="revenue-point"
+                    cx="${point.x}"
+                    cy="${point.y}"
+                    r="4"
+                ></circle>
+            `
+        ).join("");
+
+
+    if (axis) {
+
+        const first =
+            rows[0].date;
+
+        const last =
+            rows[rows.length - 1].date;
+
+        axis.innerHTML = `
+            <span>
+                ${formatChartDate(first)}
+            </span>
+
+            <span>
+                ${formatChartDate(last)}
+            </span>
+        `;
+
+    }
+}
+
+
+/* =========================================================
+   INVENTORY HEALTH
+   ========================================================= */
+
+function renderInventoryHealth(data) {
+
+    const total =
+        Number(data.total || 0);
+
+    const healthy =
+        Number(data.healthy || 0);
+
+    const low =
+        Number(data.low_stock || 0);
+
+    const stockout =
+        Number(data.stockout || 0);
+
+    const slow =
+        Number(data.slow_moving || 0);
+
+
+    const totalEl =
+        document.getElementById(
+            "inventoryTotal"
+        );
+
+    if (totalEl) {
+
+        totalEl.textContent =
+            `${total} inventory records`;
+
+    }
+
+
+    setText(
+        "healthyCount",
+        healthy
+    );
+
+    setText(
+        "lowStockCount",
+        low
+    );
+
+    setText(
+        "stockoutCount",
+        stockout
+    );
+
+    setText(
+        "slowMovingCount",
+        slow
+    );
+
+
+    if (!total) {
+        return;
+    }
+
+
+    setWidth(
+        "healthyBar",
+        healthy,
+        total
+    );
+
+    setWidth(
+        "lowStockBar",
+        low,
+        total
+    );
+
+    setWidth(
+        "stockoutBar",
+        stockout,
+        total
+    );
+
+    setWidth(
+        "slowMovingBar",
+        slow,
+        total
+    );
+}
+
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+
+function setText(
+    id,
+    value
+) {
+
+    const element =
+        document.getElementById(id);
+
+    if (element) {
+        element.textContent =
+            value;
+    }
+}
+
+
+function setWidth(
+    id,
+    value,
+    total
+) {
+
+    const element =
+        document.getElementById(id);
+
+    if (!element) {
+        return;
+    }
+
+    const percentage =
+        Math.max(
+            (value / total) * 100,
+            0
+        );
+
+    element.style.width =
+        `${percentage}%`;
+}
+
+
+function formatCurrency(
+    value
+) {
+
+    return new Intl.NumberFormat(
+        "en-IN",
+        {
+            style: "currency",
+            currency: "INR",
+            maximumFractionDigits: 0
+        }
+    ).format(value);
+
+}
+
+
+function formatChartDate(
+    value
+) {
+
+    const date =
+        new Date(value);
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+        return value;
+    }
+
+    return date.toLocaleDateString(
+        "en-IN",
+        {
+            day: "numeric",
+            month: "short"
+        }
+    );
+}
+
+
+function showPerformanceFallback() {
+
+    const revenue =
+        document.getElementById(
+            "chartRevenue"
+        );
+
+    const total =
+        document.getElementById(
+            "inventoryTotal"
+        );
+
+    if (revenue) {
+        revenue.textContent =
+            "—";
+    }
+
+    if (total) {
+        total.textContent =
+            "Data unavailable";
+    }
+
+}
+
+
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+        loadPerformance();
+
+    }
+);
+
+</script>
+<script>
+/* =========================================================
+   STORESENSE COPILOT
+   Frontend ↔ /api/copilot
+   ========================================================= */
+
+let copilotBusy = false;
+
+
+/* ---------------------------------------------------------
+   QUICK QUESTION
+   --------------------------------------------------------- */
+
+function ask(question) {
+
+    const input = document.getElementById("question");
+
+    if (!input) {
+        console.error("Copilot question input not found.");
+        return;
+    }
+
+    input.value = question;
+
+    sendQuestion();
+}
+
+
+/* ---------------------------------------------------------
+   ENTER KEY
+   --------------------------------------------------------- */
+
+function handleQuestionKey(event) {
+
+    /*
+     * Enter = send
+     * Shift + Enter = new line
+     */
+
+    if (
+        event.key === "Enter" &&
+        !event.shiftKey
+    ) {
+
+        event.preventDefault();
+
+        sendQuestion();
+    }
+}
+
+
+/* ---------------------------------------------------------
+   SEND QUESTION
+   --------------------------------------------------------- */
+
+async function sendQuestion() {
+
+    if (copilotBusy) {
+        return;
+    }
+
+    const input = document.getElementById("question");
+    const answerBox = document.getElementById("answer");
+
+    if (!input || !answerBox) {
+        console.error("Copilot elements not found.");
+        return;
+    }
+
+    const question = input.value.trim();
+
+    if (!question) {
+
+        showCopilotMessage(
+            "Please enter a question about your sales or inventory."
+        );
+
+        input.focus();
+
+        return;
+    }
+
+
+    copilotBusy = true;
+
+    setCopilotLoading(true);
+
+
+    try {
+
+        const response = await fetch(
+            "/api/copilot",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    question: question
+                })
+            }
+        );
+
+
+        /*
+         * Try to read JSON even when the server
+         * returns an error response.
+         */
+
+        let data;
+
+        try {
+            data = await response.json();
+        }
+
+        catch (jsonError) {
+
+            throw new Error(
+                "The server returned an invalid response."
+            );
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                data.answer ||
+                "Copilot request failed."
+            );
+
+        }
+
+
+        if (!data.ok) {
+
+            throw new Error(
+                data.answer ||
+                "StoreSense could not answer that question."
+            );
+
+        }
+
+
+        renderCopilotAnswer(data);
+
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "StoreSense Copilot error:",
+            error
+        );
+
+
+        showCopilotError(
+            error.message ||
+            "Unable to connect to StoreSense Copilot."
+        );
+
+    }
+
+    finally {
+
+        copilotBusy = false;
+
+        setCopilotLoading(false);
+
+    }
+}
+
+
+/* ---------------------------------------------------------
+   LOADING STATE
+   --------------------------------------------------------- */
+
+function setCopilotLoading(loading) {
+
+    const input = document.getElementById("question");
+    const answerBox = document.getElementById("answer");
+    const button = document.querySelector(".ask-button");
+
+    if (loading) {
+
+        if (input) {
+            input.disabled = true;
+        }
+
+        if (button) {
+
+            button.disabled = true;
+
+            button.innerHTML = `
+                <span class="copilot-button-spinner"></span>
+                <span>Analyzing...</span>
+            `;
+        }
+
+
+        if (answerBox) {
+
+            answerBox.innerHTML = `
+                <div class="copilot-loading">
+
+                    <div class="copilot-loader"></div>
+
+                    <div>
+                        <strong>Analyzing your retail data</strong>
+
+                        <p>
+                            Checking sales, inventory,
+                            products, and store evidence...
+                        </p>
+                    </div>
+
+                </div>
+            `;
+        }
+
+    }
+
+    else {
+
+        if (input) {
+            input.disabled = false;
+        }
+
+        if (button) {
+
+            button.disabled = false;
+
+            button.innerHTML = `
+                <span>
+                    Ask StoreSense
+                </span>
+
+                <span class="ask-arrow">
+                    →
+                </span>
+            `;
+        }
+
+    }
+}
+
+
+/* ---------------------------------------------------------
+   RENDER ANSWER
+   --------------------------------------------------------- */
+
+function renderCopilotAnswer(data) {
+
+    const answerBox = document.getElementById("answer");
+
+    if (!answerBox) {
+        return;
+    }
+
+
+    const answer = data.answer || "";
+
+    const intent = data.intent || "GENERAL";
+
+    const source = data.source || "";
+
+    const confidence = data.confidence;
+
+
+    /*
+     * Convert new lines into readable paragraphs.
+     * Escape HTML first for safety.
+     */
+
+    const safeAnswer = escapeCopilotHTML(answer)
+        .replace(/\n\n+/g, "</p><p>")
+        .replace(/\n/g, "<br>");
+
+
+    let sourceLabel = "Verified evidence";
+
+    if (source === "gemini_grounded") {
+        sourceLabel = "Gemini · Grounded in evidence";
+    }
+
+    else if (
+        source &&
+        source.startsWith("deterministic")
+    ) {
+        sourceLabel = "StoreSense · Verified data";
+    }
+
+
+    let confidenceHTML = "";
+
+    if (
+        typeof confidence === "number"
+    ) {
+
+        confidenceHTML = `
+            <span class="copilot-meta-chip">
+                Confidence ${(confidence * 100).toFixed(0)}%
+            </span>
+        `;
+
+    }
+
+
+    answerBox.innerHTML = `
+
+        <div class="copilot-answer-card">
+
+            <div class="copilot-answer-header">
+
+                <div class="copilot-answer-title">
+
+                    <span class="copilot-answer-icon">
+                        ✦
+                    </span>
+
+                    <div>
+
+                        <div class="copilot-answer-kicker">
+                            STORESENSE ANSWER
+                        </div>
+
+                        <h3>
+                            Evidence-backed insight
+                        </h3>
+
+                    </div>
+
+                </div>
+
+
+                <div class="copilot-answer-badge">
+                    ✓ Verified
+                </div>
+
+            </div>
+
+
+            <div class="copilot-answer-body">
+
+                <p>${safeAnswer}</p>
+
+            </div>
+
+
+            <div class="copilot-answer-footer">
+
+                <span class="copilot-meta-chip">
+                    ${escapeCopilotHTML(sourceLabel)}
+                </span>
+
+                <span class="copilot-meta-chip">
+                    ${escapeCopilotHTML(intent)}
+                </span>
+
+                ${confidenceHTML}
+
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+/* ---------------------------------------------------------
+   NORMAL MESSAGE
+   --------------------------------------------------------- */
+
+function showCopilotMessage(message) {
+
+    const answerBox = document.getElementById("answer");
+
+    if (!answerBox) {
+        return;
+    }
+
+    answerBox.innerHTML = `
+
+        <div class="copilot-message">
+
+            <span class="copilot-message-icon">
+                ℹ
+            </span>
+
+            <div>
+                ${escapeCopilotHTML(message)}
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+/* ---------------------------------------------------------
+   ERROR
+   --------------------------------------------------------- */
+
+function showCopilotError(message) {
+
+    const answerBox = document.getElementById("answer");
+
+    if (!answerBox) {
+        return;
+    }
+
+
+    answerBox.innerHTML = `
+
+        <div class="copilot-error">
+
+            <div class="copilot-error-icon">
+                !
+            </div>
+
+            <div>
+
+                <strong>
+                    Copilot couldn't complete that request
+                </strong>
+
+                <p>
+                    ${escapeCopilotHTML(message)}
+                </p>
+
+                <small>
+                    Check that the StoreSense backend is running
+                    and Gemini is configured.
+                </small>
+
+            </div>
+
+        </div>
+
+    `;
+}
+
+
+/* ---------------------------------------------------------
+   HTML ESCAPE
+   --------------------------------------------------------- */
+
+function escapeCopilotHTML(value) {
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+</script>
+
+
+</body>
+
+</html>

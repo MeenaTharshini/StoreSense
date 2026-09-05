@@ -1,0 +1,1258 @@
+/* ============================================================
+   STORESENSE — DATA CENTER
+   Premium Cream / Black / Antique Gold Theme
+   ============================================================ */
+
+
+/* ============================================================
+   ROOT VARIABLES
+   ============================================================ */
+
+:root {
+    --cream: #f4efe4;
+    --paper: #faf7f0;
+    --white: #fffdf8;
+
+    --black: #111111;
+    --black-soft: #1b1b1b;
+    --black-muted: #2b2b2b;
+
+    --gold: #b08a3c;
+    --gold-dark: #8f6d2d;
+    --gold-light: #d4b66a;
+
+    --border: #d8d0c1;
+    --border-dark: #c4b9a7;
+
+    --text: #171717;
+    --text-muted: #6e685e;
+
+    --success: #42634a;
+    --success-bg: #edf4ed;
+
+    --error: #8a3f35;
+    --error-bg: #f7ece9;
+
+    --warning: #8a692d;
+    --warning-bg: #f8f1df;
+
+    --shadow-soft:
+        0 8px 25px rgba(20, 17, 12, 0.06);
+
+    --shadow-card:
+        0 12px 35px rgba(20, 17, 12, 0.08);
+
+    --transition:
+        180ms ease;
+}
+
+
+/* ============================================================
+   GLOBAL RESET
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+
+    background: var(--cream);
+    color: var(--text);
+
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button,
+a,
+input,
+select {
+    -webkit-tap-highlight-color: transparent;
+}
+
+a {
+    color: inherit;
+}
+
+
+/* ============================================================
+   APPLICATION SHELL
+   ============================================================ */
+
+.app-shell {
+    min-height: 100vh;
+    width: 100%;
+
+    display: flex;
+    align-items: stretch;
+}
+
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+
+.main-content {
+    flex: 1;
+
+    min-width: 0;
+    min-height: 100vh;
+
+    padding: 42px 52px 32px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255, 253, 248, 0.55),
+            rgba(244, 239, 228, 0.9)
+        );
+}
+
+
+/* ============================================================
+   TOP HEADER
+   ============================================================ */
+
+.data-topbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 40px;
+
+    padding-bottom: 34px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.breadcrumb {
+    margin-bottom: 10px;
+
+    color: var(--gold-dark);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.data-topbar h1 {
+    margin: 0;
+
+    color: var(--black);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: clamp(34px, 4vw, 54px);
+    font-weight: 400;
+
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+}
+
+.data-topbar p {
+    max-width: 700px;
+
+    margin: 14px 0 0;
+
+    color: var(--text-muted);
+
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+
+/* ============================================================
+   DASHBOARD BACK BUTTON
+   ============================================================ */
+
+.data-back-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    min-height: 42px;
+
+    padding: 0 17px;
+
+    border: 1px solid var(--border-dark);
+
+    background: var(--paper);
+
+    color: var(--black);
+
+    text-decoration: none;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    letter-spacing: 0.04em;
+
+    transition:
+        background var(--transition),
+        border-color var(--transition),
+        color var(--transition),
+        transform var(--transition);
+}
+
+.data-back-button:hover {
+    background: var(--black);
+    border-color: var(--black);
+    color: var(--white);
+
+    transform: translateY(-1px);
+}
+
+.data-back-button:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   DATABASE STATUS STRIP
+   ============================================================ */
+
+.data-status-strip {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    margin: 28px 0 34px;
+
+    border: 1px solid var(--border);
+
+    background: rgba(250, 247, 240, 0.78);
+
+    box-shadow: var(--shadow-soft);
+}
+
+.data-status-item {
+    min-height: 82px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 13px;
+
+    padding: 17px 20px;
+
+    border-right: 1px solid var(--border);
+}
+
+.data-status-item:last-child {
+    border-right: none;
+}
+
+.data-status-item strong {
+    display: block;
+
+    margin-bottom: 2px;
+
+    color: var(--black);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 15px;
+    font-weight: 400;
+}
+
+.data-status-item span:not(
+    .data-status-dot,
+    .data-status-icon
+) {
+    display: block;
+
+    color: var(--text-muted);
+
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+
+/* ============================================================
+   STATUS DOT
+   ============================================================ */
+
+.data-status-dot {
+    width: 10px;
+    height: 10px;
+
+    flex: 0 0 10px;
+
+    border-radius: 50%;
+
+    background: var(--success);
+
+    box-shadow:
+        0 0 0 4px rgba(66, 99, 74, 0.12);
+}
+
+
+/* ============================================================
+   STATUS ICON
+   ============================================================ */
+
+.data-status-icon {
+    width: 34px;
+    height: 34px;
+
+    flex: 0 0 34px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid var(--gold-light);
+
+    color: var(--gold-dark);
+
+    background: rgba(176, 138, 60, 0.07);
+
+    font-size: 17px;
+    font-weight: 600;
+}
+
+
+/* ============================================================
+   DATA GRID
+   ============================================================ */
+
+.data-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+
+    gap: 20px;
+
+    margin-bottom: 42px;
+}
+
+
+/* ============================================================
+   DATA CARD
+   ============================================================ */
+
+.data-card {
+    position: relative;
+
+    min-width: 0;
+
+    padding: 28px;
+
+    border: 1px solid var(--border);
+
+    background: var(--paper);
+
+    box-shadow: var(--shadow-soft);
+
+    transition:
+        transform var(--transition),
+        box-shadow var(--transition),
+        border-color var(--transition);
+}
+
+.data-card:hover {
+    border-color: var(--border-dark);
+
+    box-shadow: var(--shadow-card);
+
+    transform: translateY(-2px);
+}
+
+
+/* ============================================================
+   DATA CARD HEADER
+   ============================================================ */
+
+.data-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 18px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.section-kicker {
+    margin-bottom: 7px;
+
+    color: var(--gold-dark);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.data-card h2 {
+    margin: 0;
+
+    color: var(--black);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 25px;
+    font-weight: 400;
+
+    letter-spacing: -0.02em;
+}
+
+.data-card-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+
+    flex: 0 0 34px;
+
+    border: 1px solid var(--gold-light);
+
+    color: var(--gold-dark);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   CARD DESCRIPTION
+   ============================================================ */
+
+.data-card-description {
+    min-height: 62px;
+
+    margin: 18px 0 22px;
+
+    color: var(--text-muted);
+
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+
+/* ============================================================
+   FORM
+   ============================================================ */
+
+.data-card form {
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* ============================================================
+   FORM LABEL
+   ============================================================ */
+
+.data-card label {
+    margin: 0 0 7px;
+
+    color: var(--black);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.data-card label:not(:first-child) {
+    margin-top: 15px;
+}
+
+
+/* ============================================================
+   INPUTS / SELECT
+   ============================================================ */
+
+.data-card input,
+.data-card select {
+    width: 100%;
+    height: 45px;
+
+    padding: 0 13px;
+
+    border: 1px solid var(--border-dark);
+
+    border-radius: 0;
+
+    outline: none;
+
+    background: var(--white);
+
+    color: var(--black);
+
+    font-size: 13px;
+
+    transition:
+        border-color var(--transition),
+        box-shadow var(--transition),
+        background var(--transition);
+}
+
+.data-card input::placeholder {
+    color: #aaa297;
+}
+
+.data-card input:hover,
+.data-card select:hover {
+    border-color: #a99d8c;
+}
+
+.data-card input:focus,
+.data-card select:focus {
+    border-color: var(--gold);
+
+    background: #fffefb;
+
+    box-shadow:
+        0 0 0 3px rgba(176, 138, 60, 0.12);
+}
+
+.data-card input:focus-visible,
+.data-card select:focus-visible {
+    outline: none;
+}
+
+
+/* ============================================================
+   SELECT
+   ============================================================ */
+
+.data-card select {
+    cursor: pointer;
+
+    appearance: none;
+
+    padding-right: 38px;
+
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--gold-dark) 50%),
+        linear-gradient(135deg, var(--gold-dark) 50%, transparent 50%);
+
+    background-position:
+        calc(100% - 17px) 19px,
+        calc(100% - 12px) 19px;
+
+    background-size:
+        5px 5px,
+        5px 5px;
+
+    background-repeat: no-repeat;
+}
+
+
+/* ============================================================
+   NUMBER INPUT
+   ============================================================ */
+
+.data-card input[type="number"] {
+    appearance: textfield;
+}
+
+.data-card input[type="number"]::-webkit-inner-spin-button,
+.data-card input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+
+    appearance: none;
+}
+
+
+/* ============================================================
+   PRIMARY BUTTON
+   ============================================================ */
+
+.data-primary-button {
+    width: 100%;
+    min-height: 46px;
+
+    margin-top: 22px;
+
+    border: 1px solid var(--black);
+
+    border-radius: 0;
+
+    background: var(--black);
+
+    color: var(--white);
+
+    cursor: pointer;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+
+    transition:
+        background var(--transition),
+        color var(--transition),
+        border-color var(--transition),
+        transform var(--transition),
+        box-shadow var(--transition);
+}
+
+.data-primary-button:hover {
+    border-color: var(--gold-dark);
+
+    background: var(--gold);
+
+    color: var(--black);
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 5px 14px rgba(20, 17, 12, 0.12);
+}
+
+.data-primary-button:active {
+    transform: translateY(0);
+}
+
+.data-primary-button:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+}
+
+.data-primary-button:disabled {
+    opacity: 0.55;
+
+    cursor: not-allowed;
+
+    transform: none;
+
+    box-shadow: none;
+}
+
+
+/* ============================================================
+   FORM MESSAGE
+   ============================================================ */
+
+.form-message {
+    min-height: 20px;
+
+    margin-top: 11px;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+}
+
+.form-message.success {
+    padding: 9px 11px;
+
+    border: 1px solid #c9d9cb;
+
+    background: var(--success-bg);
+
+    color: var(--success);
+}
+
+.form-message.error {
+    padding: 9px 11px;
+
+    border: 1px solid #e0c7c1;
+
+    background: var(--error-bg);
+
+    color: var(--error);
+}
+
+.form-message.warning {
+    padding: 9px 11px;
+
+    border: 1px solid #e2d4ae;
+
+    background: var(--warning-bg);
+
+    color: var(--warning);
+}
+
+
+/* ============================================================
+   DATABASE SECTION
+   ============================================================ */
+
+.database-section {
+    padding: 30px;
+
+    border: 1px solid var(--black);
+
+    background: var(--black);
+
+    color: var(--white);
+
+    box-shadow:
+        0 14px 40px rgba(20, 17, 12, 0.12);
+}
+
+
+/* ============================================================
+   DATABASE HEADER
+   ============================================================ */
+
+.database-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 30px;
+
+    padding-bottom: 24px;
+
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.database-header .section-kicker {
+    color: var(--gold-light);
+}
+
+.database-header h2 {
+    margin: 0;
+
+    color: var(--white);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 30px;
+    font-weight: 400;
+
+    letter-spacing: -0.025em;
+}
+
+.database-header p {
+    margin: 8px 0 0;
+
+    color: rgba(255, 255, 255, 0.62);
+
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   SECONDARY BUTTON
+   ============================================================ */
+
+.secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 40px;
+
+    padding: 0 15px;
+
+    border: 1px solid rgba(255, 255, 255, 0.32);
+
+    border-radius: 0;
+
+    background: transparent;
+
+    color: var(--white);
+
+    cursor: pointer;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+
+    transition:
+        background var(--transition),
+        border-color var(--transition),
+        color var(--transition);
+}
+
+.secondary-button:hover {
+    border-color: var(--gold-light);
+
+    background: var(--gold);
+
+    color: var(--black);
+}
+
+.secondary-button:focus-visible {
+    outline: 2px solid var(--gold-light);
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   DATABASE COUNTS
+   ============================================================ */
+
+#databaseCounts {
+    display: grid;
+
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+
+    gap: 1px;
+
+    margin-top: 24px;
+
+    border: 1px solid rgba(255, 255, 255, 0.12);
+
+    background: rgba(255, 255, 255, 0.12);
+}
+
+
+/* ============================================================
+   DATABASE COUNT CARD
+   ============================================================ */
+
+.database-count {
+    min-height: 125px;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    padding: 22px;
+
+    background: var(--black-soft);
+}
+
+.database-count-label {
+    margin-bottom: 8px;
+
+    color: rgba(255, 255, 255, 0.56);
+
+    font-size: 10px;
+    font-weight: 700;
+
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.database-count-value {
+    color: var(--gold-light);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 32px;
+    font-weight: 400;
+
+    line-height: 1;
+}
+
+
+/* ============================================================
+   SUPPORT COMMON POSSIBLE DATABASE MARKUP
+   ============================================================ */
+
+#databaseCounts > div {
+    min-width: 0;
+}
+
+#databaseCounts strong {
+    color: var(--gold-light);
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
+    font-size: 28px;
+    font-weight: 400;
+}
+
+#databaseCounts span {
+    color: rgba(255, 255, 255, 0.58);
+
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   LOADING STATE
+   ============================================================ */
+
+.loading-state {
+    grid-column: 1 / -1;
+
+    padding: 28px;
+
+    color: rgba(255, 255, 255, 0.62);
+
+    text-align: center;
+
+    font-size: 13px;
+}
+
+
+/* ============================================================
+   EMPTY / ERROR STATE
+   ============================================================ */
+
+.empty-state,
+.error-state {
+    grid-column: 1 / -1;
+
+    padding: 24px;
+
+    border: 1px solid rgba(255, 255, 255, 0.12);
+
+    background: var(--black-soft);
+
+    text-align: center;
+}
+
+.error-state {
+    color: #e3aaa0;
+}
+
+.empty-state {
+    color: rgba(255, 255, 255, 0.62);
+}
+
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.data-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    margin-top: 28px;
+    padding: 20px 2px 4px;
+
+    border-top: 1px solid var(--border);
+
+    color: var(--text-muted);
+
+    font-size: 11px;
+
+    letter-spacing: 0.04em;
+}
+
+
+/* ============================================================
+   SIDEBAR COMPATIBILITY
+   ============================================================ */
+
+/*
+   sidebar.css controls:
+   - sidebar width
+   - collapse state
+   - mobile drawer
+   - overlay
+   - sidebar navigation
+
+   data-center.css only controls the Data Center content.
+*/
+
+#sharedSidebar {
+    flex-shrink: 0;
+}
+
+
+/* ============================================================
+   RESPONSIVE — LARGE TABLETS
+   ============================================================ */
+
+@media (max-width: 1180px) {
+
+    .main-content {
+        padding: 36px 34px 28px;
+    }
+
+    .data-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .data-grid .data-card:last-child {
+        grid-column: 1 / -1;
+    }
+
+    #databaseCounts {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+}
+
+
+/* ============================================================
+   RESPONSIVE — TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    .main-content {
+        padding: 30px 24px 26px;
+    }
+
+    .data-topbar {
+        gap: 24px;
+    }
+
+    .data-topbar h1 {
+        font-size: 40px;
+    }
+
+    .data-status-strip {
+        grid-template-columns:
+            1fr;
+    }
+
+    .data-status-item {
+        border-right: none;
+
+        border-bottom: 1px solid var(--border);
+    }
+
+    .data-status-item:last-child {
+        border-bottom: none;
+    }
+
+    .data-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+    .data-grid .data-card:last-child {
+        grid-column: auto;
+    }
+
+}
+
+
+/* ============================================================
+   RESPONSIVE — MOBILE
+   ============================================================ */
+
+@media (max-width: 760px) {
+
+    .main-content {
+        width: 100%;
+
+        padding:
+            76px
+            18px
+            24px;
+    }
+
+    .data-topbar {
+        flex-direction: column;
+
+        gap: 22px;
+
+        padding-bottom: 26px;
+    }
+
+    .data-topbar h1 {
+        font-size: 34px;
+    }
+
+    .data-topbar p {
+        font-size: 14px;
+    }
+
+    .data-back-button {
+        width: 100%;
+    }
+
+    .data-status-strip {
+        margin:
+            22px 0
+            28px;
+    }
+
+    .data-status-item {
+        padding: 15px;
+    }
+
+    .data-card {
+        padding: 22px 18px;
+    }
+
+    .data-card h2 {
+        font-size: 23px;
+    }
+
+    .data-card-description {
+        min-height: auto;
+    }
+
+    .database-section {
+        padding: 22px 18px;
+    }
+
+    .database-header {
+        flex-direction: column;
+
+        gap: 18px;
+    }
+
+    .database-header h2 {
+        font-size: 27px;
+    }
+
+    .secondary-button {
+        width: 100%;
+    }
+
+    #databaseCounts {
+        grid-template-columns:
+            1fr;
+    }
+
+    .database-count {
+        min-height: 100px;
+    }
+
+    .data-footer {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 6px;
+    }
+
+}
+
+
+/* ============================================================
+   RESPONSIVE — SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 420px) {
+
+    .main-content {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .data-topbar h1 {
+        font-size: 30px;
+    }
+
+    .data-card {
+        padding: 19px 15px;
+    }
+
+    .data-card-header {
+        gap: 12px;
+    }
+
+    .data-card-number {
+        width: 30px;
+        height: 30px;
+
+        flex-basis: 30px;
+    }
+
+    .database-section {
+        padding: 19px 14px;
+    }
+
+}
+
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+
+}
+
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+
+@media print {
+
+    body {
+        background: white;
+    }
+
+    .main-content {
+        margin: 0;
+        padding: 20px;
+    }
+
+    .data-back-button,
+    .secondary-button,
+    .data-primary-button {
+        display: none;
+    }
+
+    .data-card,
+    .database-section,
+    .data-status-strip {
+        box-shadow: none;
+    }
+
+}

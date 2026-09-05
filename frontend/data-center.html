@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="description"
+        content="StoreSense Data Center"
+    >
+
+    <title>StoreSense | Data Center</title>
+
+
+    <!-- =====================================================
+         SHARED SIDEBAR
+         ===================================================== -->
+
+    <link
+        rel="stylesheet"
+        href="/static/sidebar.css"
+    >
+
+
+    <!-- =====================================================
+         DATA CENTER STYLES
+         ===================================================== -->
+
+    <link
+        rel="stylesheet"
+        href="/static/data-center.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<div class="app-shell">
+
+
+    <!-- =====================================================
+         SHARED SIDEBAR
+         ===================================================== -->
+
+    <div id="sharedSidebar"></div>
+
+
+
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
+
+    <main class="main-content">
+
+
+        <!-- =================================================
+             HEADER
+             ================================================= -->
+
+        <header class="data-topbar">
+
+            <div>
+
+                <div class="breadcrumb">
+                    Workspace / Data Center
+                </div>
+
+                <h1>
+                    Manage Retail Data
+                </h1>
+
+                <p>
+                    Add and maintain the stores, products,
+                    inventory, and sales data used by StoreSense.
+                </p>
+
+            </div>
+
+
+            <a
+                href="/"
+                class="data-back-button"
+            >
+                ← Dashboard
+            </a>
+
+        </header>
+
+
+
+        <!-- =================================================
+             DATABASE STATUS
+             ================================================= -->
+
+        <section class="data-status-strip">
+
+
+            <!-- DATABASE -->
+
+            <div class="data-status-item">
+
+                <span class="data-status-dot"></span>
+
+                <div>
+
+                    <strong>
+                        Database
+                    </strong>
+
+                    <span id="databaseStatus">
+                        Checking connection...
+                    </span>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- MANUAL ENTRY -->
+
+            <div class="data-status-item">
+
+                <span class="data-status-icon">
+                    +
+                </span>
+
+                <div>
+
+                    <strong>
+                        Manual entry
+                    </strong>
+
+                    <span>
+                        Changes update StoreSense analytics
+                    </span>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- RECORDS -->
+
+            <div class="data-status-item">
+
+                <span class="data-status-icon">
+                    #
+                </span>
+
+                <div>
+
+                    <strong>
+                        Records
+                    </strong>
+
+                    <span id="recordStatus">
+                        Loading...
+                    </span>
+
+                </div>
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             DATA ENTRY CARDS
+             ================================================= -->
+
+        <section class="data-grid">
+
+
+            <!-- =================================================
+                 01 — ADD STORE
+                 ================================================= -->
+
+            <article class="data-card">
+
+
+                <div class="data-card-header">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            STORE
+                        </div>
+
+                        <h2>
+                            Add Store
+                        </h2>
+
+                    </div>
+
+
+                    <div class="data-card-number">
+                        01
+                    </div>
+
+                </div>
+
+
+                <p class="data-card-description">
+                    Create a store location for inventory
+                    and sales tracking.
+                </p>
+
+
+                <form id="storeForm">
+
+
+                    <!-- STORE ID -->
+
+                    <label for="storeId">
+                        Store ID
+                    </label>
+
+                    <input
+                        id="storeId"
+                        name="store_id"
+                        type="text"
+                        placeholder="ST004"
+                        required
+                    >
+
+
+                    <!-- STORE NAME -->
+
+                    <label for="storeName">
+                        Store name
+                    </label>
+
+                    <input
+                        id="storeName"
+                        name="store_name"
+                        type="text"
+                        placeholder="Downtown Store"
+                        required
+                    >
+
+
+                    <!-- LOCATION -->
+
+                    <label for="storeLocation">
+                        Location
+                    </label>
+
+                    <input
+                        id="storeLocation"
+                        name="location"
+                        type="text"
+                        placeholder="Karur"
+                    >
+
+
+                    <!-- BUTTON -->
+
+                    <button
+                        type="submit"
+                        class="data-primary-button"
+                    >
+                        Add Store
+                    </button>
+
+
+                    <!-- MESSAGE -->
+
+                    <div
+                        id="storeMessage"
+                        class="form-message"
+                    ></div>
+
+
+                </form>
+
+
+            </article>
+
+
+
+            <!-- =================================================
+                 02 — ADD PRODUCT
+                 ================================================= -->
+
+            <article class="data-card">
+
+
+                <div class="data-card-header">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            PRODUCT
+                        </div>
+
+                        <h2>
+                            Add Product
+                        </h2>
+
+                    </div>
+
+
+                    <div class="data-card-number">
+                        02
+                    </div>
+
+                </div>
+
+
+                <p class="data-card-description">
+                    Add products to the catalogue with their
+                    category and selling price.
+                </p>
+
+
+                <form id="productForm">
+
+
+                    <!-- PRODUCT ID -->
+
+                    <label for="productId">
+                        Product ID
+                    </label>
+
+                    <input
+                        id="productId"
+                        name="product_id"
+                        type="text"
+                        placeholder="P021"
+                        required
+                    >
+
+
+                    <!-- PRODUCT NAME -->
+
+                    <label for="productName">
+                        Product name
+                    </label>
+
+                    <input
+                        id="productName"
+                        name="product_name"
+                        type="text"
+                        placeholder="Wireless Headphones"
+                        required
+                    >
+
+
+                    <!-- CATEGORY -->
+
+                    <label for="productCategory">
+                        Category
+                    </label>
+
+                    <input
+                        id="productCategory"
+                        name="category"
+                        type="text"
+                        placeholder="Electronics"
+                    >
+
+
+                    <!-- PRICE -->
+
+                    <label for="productPrice">
+                        Price
+                    </label>
+
+                    <input
+                        id="productPrice"
+                        name="price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="1499"
+                    >
+
+
+                    <!-- BUTTON -->
+
+                    <button
+                        type="submit"
+                        class="data-primary-button"
+                    >
+                        Add Product
+                    </button>
+
+
+                    <!-- MESSAGE -->
+
+                    <div
+                        id="productMessage"
+                        class="form-message"
+                    ></div>
+
+
+                </form>
+
+
+            </article>
+
+
+
+            <!-- =================================================
+                 03 — SET INVENTORY
+                 ================================================= -->
+
+            <article class="data-card">
+
+
+                <div class="data-card-header">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            INVENTORY
+                        </div>
+
+                        <h2>
+                            Set Inventory
+                        </h2>
+
+                    </div>
+
+
+                    <div class="data-card-number">
+                        03
+                    </div>
+
+                </div>
+
+
+                <p class="data-card-description">
+                    Set the current stock level for a product
+                    at a selected store.
+                </p>
+
+
+                <form id="inventoryForm">
+
+
+                    <!-- STORE -->
+
+                    <label for="inventoryStore">
+                        Store
+                    </label>
+
+                    <select
+                        id="inventoryStore"
+                        name="store_id"
+                        required
+                    >
+
+                        <option value="">
+                            Select store
+                        </option>
+
+                    </select>
+
+
+                    <!-- PRODUCT -->
+
+                    <label for="inventoryProduct">
+                        Product
+                    </label>
+
+                    <select
+                        id="inventoryProduct"
+                        name="product_id"
+                        required
+                    >
+
+                        <option value="">
+                            Select product
+                        </option>
+
+                    </select>
+
+
+                    <!-- STOCK -->
+
+                    <label for="inventoryStock">
+                        Stock quantity
+                    </label>
+
+                    <input
+                        id="inventoryStock"
+                        name="stock"
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="100"
+                        required
+                    >
+
+
+                    <!-- REASON -->
+
+                    <label for="inventoryReason">
+                        Reason
+                    </label>
+
+                    <input
+                        id="inventoryReason"
+                        name="reason"
+                        type="text"
+                        value="manual update"
+                    >
+
+
+                    <!-- BUTTON -->
+
+                    <button
+                        type="submit"
+                        class="data-primary-button"
+                    >
+                        Update Inventory
+                    </button>
+
+
+                    <!-- MESSAGE -->
+
+                    <div
+                        id="inventoryMessage"
+                        class="form-message"
+                    ></div>
+
+
+                </form>
+
+
+            </article>
+
+
+
+            <!-- =================================================
+                 04 — RECORD SALE
+                 ================================================= -->
+
+            <article class="data-card sale-card">
+
+
+                <div class="data-card-header">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            SALES
+                        </div>
+
+                        <h2>
+                            Record Sale
+                        </h2>
+
+                    </div>
+
+
+                    <div class="data-card-number">
+                        04
+                    </div>
+
+                </div>
+
+
+                <p class="data-card-description">
+                    Record a completed sale. StoreSense will
+                    update inventory and use the sale in analytics.
+                </p>
+
+
+                <form id="saleForm">
+
+
+                    <!-- STORE -->
+
+                    <label for="saleStore">
+                        Store
+                    </label>
+
+                    <select
+                        id="saleStore"
+                        name="store_id"
+                        required
+                    >
+
+                        <option value="">
+                            Select store
+                        </option>
+
+                    </select>
+
+
+                    <!-- PRODUCT -->
+
+                    <label for="saleProduct">
+                        Product
+                    </label>
+
+                    <select
+                        id="saleProduct"
+                        name="product_id"
+                        required
+                    >
+
+                        <option value="">
+                            Select product
+                        </option>
+
+                    </select>
+
+
+                    <!-- UNITS SOLD -->
+
+                    <label for="saleUnits">
+                        Units sold
+                    </label>
+
+                    <input
+                        id="saleUnits"
+                        name="units_sold"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="5"
+                        required
+                    >
+
+
+                    <!-- REVENUE -->
+
+                    <label for="saleRevenue">
+                        Revenue (₹)
+                    </label>
+
+                    <input
+                        id="saleRevenue"
+                        name="revenue"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Optional"
+                    >
+
+
+                    <p class="field-help">
+                        Leave revenue empty if the backend should
+                        calculate it using the product price.
+                    </p>
+
+
+                    <!-- BUTTON -->
+
+                    <button
+                        type="submit"
+                        class="data-primary-button"
+                    >
+                        Record Sale
+                    </button>
+
+
+                    <!-- MESSAGE -->
+
+                    <div
+                        id="saleMessage"
+                        class="form-message"
+                    ></div>
+
+
+                </form>
+
+
+            </article>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             SALES EXPLANATION
+             ================================================= -->
+
+        <section class="data-info-panel">
+
+            <div class="section-kicker">
+                HOW IT WORKS
+            </div>
+
+            <h2>
+                Sales power StoreSense intelligence
+            </h2>
+
+            <p>
+                Every recorded sale becomes part of the sales
+                history used by StoreSense to calculate product
+                performance, stock velocity, stockout risk,
+                sales spikes, sales drops, and recommendations.
+            </p>
+
+            <div class="data-flow">
+
+                <div class="data-flow-step">
+                    <span>01</span>
+                    <strong>Record Sale</strong>
+                    <small>
+                        Enter store, product and units.
+                    </small>
+                </div>
+
+                <div class="data-flow-arrow">
+                    →
+                </div>
+
+                <div class="data-flow-step">
+                    <span>02</span>
+                    <strong>Update Stock</strong>
+                    <small>
+                        Inventory reflects the sale.
+                    </small>
+                </div>
+
+                <div class="data-flow-arrow">
+                    →
+                </div>
+
+                <div class="data-flow-step">
+                    <span>03</span>
+                    <strong>Analyze</strong>
+                    <small>
+                        StoreSense calculates signals.
+                    </small>
+                </div>
+
+                <div class="data-flow-arrow">
+                    →
+                </div>
+
+                <div class="data-flow-step">
+                    <span>04</span>
+                    <strong>Recommend</strong>
+                    <small>
+                        Copilot explains the action.
+                    </small>
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             DATABASE OVERVIEW
+             ================================================= -->
+
+        <section class="database-section">
+
+
+            <div class="database-header">
+
+                <div>
+
+                    <div class="section-kicker">
+                        DATABASE
+                    </div>
+
+                    <h2>
+                        Current Database
+                    </h2>
+
+                    <p>
+                        A quick view of the records currently
+                        available to StoreSense.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="secondary-button"
+                    onclick="loadDatabaseStatus()"
+                >
+                    ↻ Refresh
+                </button>
+
+            </div>
+
+
+            <div id="databaseCounts">
+
+                <div class="loading-state">
+                    Loading database information...
+                </div>
+
+            </div>
+
+
+        </section>
+
+
+
+        <!-- =================================================
+             FOOTER
+             ================================================= -->
+
+        <footer class="data-footer">
+
+            <span>
+                StoreSense · Data Center
+            </span>
+
+            <span>
+                Retail data management
+            </span>
+
+        </footer>
+
+
+    </main>
+
+
+</div>
+
+
+
+<!-- =========================================================
+     SHARED SIDEBAR
+     ========================================================= -->
+
+<script src="/static/sidebar.js"></script>
+
+
+<script>
+
+async function loadSidebar() {
+
+    try {
+
+        const response =
+            await fetch("/static/sidebar.html");
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Sidebar could not be loaded."
+            );
+
+        }
+
+        const html =
+            await response.text();
+
+        document
+            .getElementById("sharedSidebar")
+            .innerHTML = html;
+
+        if (typeof initializeSidebar === "function") {
+            initializeSidebar();
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Sidebar loading failed:",
+            error
+        );
+
+    }
+
+}
+
+loadSidebar();
+
+</script>
+
+
+
+<!-- =========================================================
+     DATA CENTER JAVASCRIPT
+     ========================================================= -->
+
+<script src="/static/data-center.js"></script>
+
+
+</body>
+
+</html>

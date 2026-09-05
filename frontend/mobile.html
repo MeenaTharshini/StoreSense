@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <meta
+        name="theme-color"
+        content="#11110f"
+    >
+
+    <title>StoreSense • Quick Sale</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/mobile.css"
+    >
+</head>
+
+
+<body>
+
+    <!-- =====================================================
+         HEADER
+         ===================================================== -->
+
+    <header class="header">
+
+        <div class="header-content">
+
+            <div class="brand-row">
+
+                <div class="brand-icon">
+                    S
+                </div>
+
+                <div class="brand-copy">
+
+                    <div class="logo">
+                        StoreSense
+                    </div>
+
+                    <div class="subtitle">
+                        Intelligent Retail Monitoring
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="page-heading">
+
+                <div class="eyebrow">
+                    POINT OF SALE
+                </div>
+
+                <h1>
+                    Quick Sale
+                </h1>
+
+                <p>
+                    Record a customer sale in seconds.
+                    Inventory updates automatically.
+                </p>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         MAIN
+         ===================================================== -->
+
+    <main class="container">
+
+
+        <!-- =================================================
+             CURRENT STORE
+             ================================================= -->
+
+        <section class="store-card">
+
+            <div class="store-left">
+
+                <div class="store-icon">
+                    <span>⌂</span>
+                </div>
+
+                <div class="store-details">
+
+                    <div class="store-label">
+                        CURRENT STORE
+                    </div>
+
+                    <div
+                        class="store-name"
+                        id="storeName"
+                    >
+                        Loading...
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="live-badge">
+
+                <span class="live-dot"></span>
+
+                <span>
+                    LIVE
+                </span>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             SALE CARD
+             ================================================= -->
+
+        <section class="sale-card">
+
+
+            <!-- CARD HEADER -->
+
+            <div class="card-header">
+
+                <div class="card-header-icon">
+                    +
+                </div>
+
+                <div>
+
+                    <h2>
+                        Record a Sale
+                    </h2>
+
+                    <p class="card-subtitle">
+                        Stock will be reduced automatically
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <!-- FORM -->
+
+            <form id="saleForm">
+
+
+                <!-- PRODUCT -->
+
+                <div class="form-group">
+
+                    <label for="product">
+
+                        Product
+
+                        <span class="label-hint">
+                            Required
+                        </span>
+
+                    </label>
+
+
+                    <div class="select-wrapper">
+
+                        <select
+                            id="product"
+                            required
+                        >
+
+                            <option value="">
+                                Loading products...
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- STOCK -->
+
+                    <div
+                        id="stockInfo"
+                        class="stock-info"
+                    >
+
+                        <span class="stock-icon">
+                            □
+                        </span>
+
+                        <span id="stockText">
+                            Current stock
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- QUANTITY -->
+
+                <div class="form-group">
+
+                    <label for="quantity">
+
+                        Quantity Sold
+
+                        <span class="label-hint">
+                            Units
+                        </span>
+
+                    </label>
+
+
+                    <div class="quantity-wrapper">
+
+                        <button
+                            type="button"
+                            class="quantity-btn"
+                            id="minusBtn"
+                            aria-label="Decrease quantity"
+                        >
+                            −
+                        </button>
+
+
+                        <input
+                            type="number"
+                            id="quantity"
+                            value="1"
+                            min="1"
+                            step="1"
+                            inputmode="numeric"
+                            required
+                            aria-label="Quantity"
+                        >
+
+
+                        <button
+                            type="button"
+                            class="quantity-btn"
+                            id="plusBtn"
+                            aria-label="Increase quantity"
+                        >
+                            +
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- SUBMIT -->
+
+                <button
+                    type="submit"
+                    class="submit-btn"
+                    id="submitBtn"
+                >
+
+                    <span class="submit-icon">
+                        ✓
+                    </span>
+
+                    <span>
+                        Record Sale
+                    </span>
+
+                </button>
+
+            </form>
+
+
+            <!-- MESSAGE -->
+
+            <div
+                id="message"
+                class="message"
+                role="status"
+                aria-live="polite"
+            ></div>
+
+
+            <!-- INFORMATION -->
+
+            <div class="info-note">
+
+                <span class="info-icon">
+                    i
+                </span>
+
+                <span>
+                    Every sale is saved to StoreSense and
+                    inventory is updated automatically.
+                </span>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             FOOTER
+             ================================================= -->
+
+        <footer class="footer">
+
+            <strong>
+                StoreSense
+            </strong>
+
+            <span>
+                •
+            </span>
+
+            Secure Retail Quick Entry
+
+            <br>
+
+            Sales &amp; inventory sync automatically
+
+        </footer>
+
+    </main>
+
+
+    <!-- =====================================================
+         JAVASCRIPT
+         ===================================================== -->
+
+    <script>
+
+        /* =====================================================
+           STORE IDENTIFICATION
+           ===================================================== */
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const storeId =
+            params.get("store");
+
+
+        /* =====================================================
+           DOM ELEMENTS
+           ===================================================== */
+
+        const storeNameElement =
+            document.getElementById(
+                "storeName"
+            );
+
+        const productSelect =
+            document.getElementById(
+                "product"
+            );
+
+        const quantityInput =
+            document.getElementById(
+                "quantity"
+            );
+
+        const minusBtn =
+            document.getElementById(
+                "minusBtn"
+            );
+
+        const plusBtn =
+            document.getElementById(
+                "plusBtn"
+            );
+
+        const saleForm =
+            document.getElementById(
+                "saleForm"
+            );
+
+        const submitBtn =
+            document.getElementById(
+                "submitBtn"
+            );
+
+        const messageElement =
+            document.getElementById(
+                "message"
+            );
+
+        const stockInfo =
+            document.getElementById(
+                "stockInfo"
+            );
+
+        const stockText =
+            document.getElementById(
+                "stockText"
+            );
+
+
+        /* =====================================================
+           SHOW MESSAGE
+           ===================================================== */
+
+        function showMessage(text, type) {
+
+            messageElement.textContent =
+                text;
+
+            messageElement.className =
+                "message " + type;
+
+        }
+
+
+        /* =====================================================
+           LOAD STORE
+           ===================================================== */
+
+        async function loadStore() {
+
+            if (!storeId) {
+
+                storeNameElement.textContent =
+                    "Store not specified";
+
+                return;
+
+            }
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `/api/mobile/store/${encodeURIComponent(storeId)}`
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Store not found"
+                    );
+
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                storeNameElement.textContent =
+                    data.store_name ||
+                    data.name ||
+                    "Unknown Store";
+
+
+            } catch (error) {
+
+                storeNameElement.textContent =
+                    "Unknown Store";
+
+                console.error(
+                    "Store loading error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =====================================================
+           LOAD PRODUCTS
+           ===================================================== */
+
+        async function loadProducts() {
+
+            productSelect.innerHTML =
+                `
+                <option value="">
+                    Loading products...
+                </option>
+                `;
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `/api/mobile/products?store=${encodeURIComponent(storeId || "")}`
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        "Unable to load products"
+                    );
+
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                /*
+                 * Supports both:
+                 *
+                 * {
+                 *     products: [...]
+                 * }
+                 *
+                 * and:
+                 *
+                 * [...]
+                 */
+
+                const products =
+                    Array.isArray(data)
+                        ? data
+                        : (data.products || []);
+
+
+                productSelect.innerHTML =
+                    `
+                    <option value="">
+                        Select a product
+                    </option>
+                    `;
+
+
+                if (products.length === 0) {
+
+                    productSelect.innerHTML =
+                        `
+                        <option value="">
+                            No products available
+                        </option>
+                        `;
+
+                    return;
+
+                }
+
+
+                products.forEach(product => {
+
+                    const option =
+                        document.createElement(
+                            "option"
+                        );
+
+
+                    option.value =
+                        product.product_id;
+
+
+                    option.textContent =
+                        product.product_name;
+
+
+                    option.dataset.stock =
+                        product.stock ?? "";
+
+
+                    productSelect.appendChild(
+                        option
+                    );
+
+                });
+
+
+            } catch (error) {
+
+                productSelect.innerHTML =
+                    `
+                    <option value="">
+                        Unable to load products
+                    </option>
+                    `;
+
+
+                showMessage(
+                    "Could not load products. Please refresh the page.",
+                    "error"
+                );
+
+
+                console.error(
+                    "Product loading error:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /* =====================================================
+           PRODUCT CHANGE
+           ===================================================== */
+
+        productSelect.addEventListener(
+            "change",
+            function () {
+
+                const selected =
+                    productSelect.options[
+                        productSelect.selectedIndex
+                    ];
+
+
+                if (
+                    !selected ||
+                    !selected.value
+                ) {
+
+                    stockInfo.classList.remove(
+                        "visible"
+                    );
+
+                    return;
+
+                }
+
+
+                const stock =
+                    selected.dataset.stock;
+
+
+                if (
+                    stock !== undefined &&
+                    stock !== ""
+                ) {
+
+                    stockText.textContent =
+                        `Current stock: ${stock} units`;
+
+                    stockInfo.classList.add(
+                        "visible"
+                    );
+
+                } else {
+
+                    stockInfo.classList.remove(
+                        "visible"
+                    );
+
+                }
+
+            }
+        );
+
+
+        /* =====================================================
+           QUANTITY — MINUS
+           ===================================================== */
+
+        minusBtn.addEventListener(
+            "click",
+            function () {
+
+                let value =
+                    parseInt(
+                        quantityInput.value
+                    ) || 1;
+
+
+                if (value > 1) {
+
+                    value--;
+
+                }
+
+
+                quantityInput.value =
+                    value;
+
+            }
+        );
+
+
+        /* =====================================================
+           QUANTITY — PLUS
+           ===================================================== */
+
+        plusBtn.addEventListener(
+            "click",
+            function () {
+
+                let value =
+                    parseInt(
+                        quantityInput.value
+                    ) || 1;
+
+
+                value++;
+
+
+                quantityInput.value =
+                    value;
+
+            }
+        );
+
+
+        /* =====================================================
+           QUANTITY VALIDATION
+           ===================================================== */
+
+        quantityInput.addEventListener(
+            "input",
+            function () {
+
+                let value =
+                    parseInt(
+                        quantityInput.value
+                    );
+
+
+                if (
+                    Number.isNaN(value) ||
+                    value < 1
+                ) {
+
+                    quantityInput.value =
+                        1;
+
+                }
+
+            }
+        );
+
+
+        /* =====================================================
+           SUBMIT SALE
+           ===================================================== */
+
+        saleForm.addEventListener(
+            "submit",
+            async function (event) {
+
+                event.preventDefault();
+
+
+                if (!storeId) {
+
+                    showMessage(
+                        "Store information is missing from this QR link.",
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                const productId =
+                    productSelect.value;
+
+
+                const quantity =
+                    parseInt(
+                        quantityInput.value
+                    );
+
+
+                if (!productId) {
+
+                    showMessage(
+                        "Please select a product.",
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                if (
+                    Number.isNaN(quantity) ||
+                    quantity < 1
+                ) {
+
+                    showMessage(
+                        "Quantity must be at least 1.",
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                /* =============================================
+                   CHECK CURRENT STOCK
+                   ============================================= */
+
+                const selected =
+                    productSelect.options[
+                        productSelect.selectedIndex
+                    ];
+
+
+                const currentStock =
+                    parseInt(
+                        selected?.dataset.stock
+                    );
+
+
+                if (
+                    !Number.isNaN(currentStock) &&
+                    quantity > currentStock
+                ) {
+
+                    showMessage(
+                        `Only ${currentStock} unit(s) are currently in stock.`,
+                        "error"
+                    );
+
+                    return;
+
+                }
+
+
+                /* =============================================
+                   LOADING STATE
+                   ============================================= */
+
+                submitBtn.disabled =
+                    true;
+
+
+                submitBtn.innerHTML =
+                    `
+                    <span class="spinner"></span>
+                    <span>Recording sale...</span>
+                    `;
+
+
+                try {
+
+                    const response =
+                        await fetch(
+                            "/api/mobile/sale",
+                            {
+
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                /*
+                                 * IMPORTANT:
+                                 * Backend expects units_sold,
+                                 * not quantity.
+                                 */
+
+                                body:
+                                    JSON.stringify({
+
+                                        store_id:
+                                            storeId,
+
+                                        product_id:
+                                            productId,
+
+                                        units_sold:
+                                            quantity
+
+                                    })
+
+                            }
+                        );
+
+
+                    let data;
+
+                    try {
+
+                        data =
+                            await response.json();
+
+                    } catch {
+
+                        data = {};
+
+                    }
+
+
+                    if (!response.ok) {
+
+                        throw new Error(
+                            data.detail ||
+                            data.message ||
+                            data.error ||
+                            "Unable to record sale"
+                        );
+
+                    }
+
+
+                    const productName =
+                        data.product_name ||
+                        data.sale?.product_name ||
+                        selected.textContent;
+
+
+                    /* =============================================
+                       SUCCESS
+                       ============================================= */
+
+                    showMessage(
+                        `✓ Sale recorded successfully. ${quantity} unit(s) of ${productName} sold.`,
+                        "success"
+                    );
+
+
+                    quantityInput.value =
+                        1;
+
+
+                    /* =============================================
+                       REFRESH STOCK
+                       ============================================= */
+
+                    await loadProducts();
+
+
+                    /*
+                     * Re-select the sold product
+                     * after refreshing the list.
+                     */
+
+                    productSelect.value =
+                        productId;
+
+
+                    productSelect.dispatchEvent(
+                        new Event("change")
+                    );
+
+
+                } catch (error) {
+
+                    showMessage(
+                        `✕ ${error.message}`,
+                        "error"
+                    );
+
+
+                    console.error(
+                        "Sale error:",
+                        error
+                    );
+
+                } finally {
+
+                    submitBtn.disabled =
+                        false;
+
+
+                    submitBtn.innerHTML =
+                        `
+                        <span class="submit-icon">
+                            ✓
+                        </span>
+
+                        <span>
+                            Record Sale
+                        </span>
+                        `;
+
+                }
+
+            }
+        );
+
+
+        /* =====================================================
+           INITIALIZE
+           ===================================================== */
+
+        async function initialize() {
+
+            await loadStore();
+
+            await loadProducts();
+
+        }
+
+
+        initialize();
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,21 @@
+product_id,product_name,category,unit_price
+P001,Wireless Mouse,Accessories,899
+P002,Mechanical Keyboard,Accessories,2499
+P003,USB-C Cable,Accessories,499
+P004,Laptop Stand,Accessories,1499
+P005,Power Bank,Mobile,1799
+P006,Bluetooth Speaker,Audio,2299
+P007,Webcam,Accessories,1999
+P008,Gaming Headset,Audio,2999
+P009,Phone Charger,Mobile,799
+P010,Smart Watch,Wearables,3499
+P011,HDMI Cable,Accessories,699
+P012,Wireless Earbuds,Audio,2199
+P013,Phone Case,Mobile,399
+P014,Keyboard Wrist Rest,Accessories,599
+P015,Portable SSD,Storage,5499
+P016,USB Hub,Accessories,1299
+P017,Laptop Sleeve,Accessories,999
+P018,Tablet Stand,Accessories,1199
+P019,Desk Lamp,Office,1399
+P020,Power Strip,Office,1099
