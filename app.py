@@ -1,16 +1,41 @@
-from pathlib import Path
+from __future__ import annotations
+
 import os
+from pathlib import Path
 
 import pandas as pd
+import psycopg
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Depends,
+)
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+)
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
+from fastapi.encoders import jsonable_encoder
+
 from pydantic import BaseModel, Field
 
 from src.database import RetailData
 from src.analytics import RetailAnalytics
 from src.copilot import StoreSenseCopilot
+
+from src.auth import (
+    initialize_auth,
+    authenticate_user,
+    create_access_token,
+    create_user,
+    get_user_from_token,
+    public_user,
+)
 
 
 # ============================================================
@@ -18,19 +43,21 @@ from src.copilot import StoreSenseCopilot
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+
 FRONTEND_DIR = BASE_DIR / "frontend"
+
 DATA_DIR = BASE_DIR / "data"
 
 
 # ============================================================
-# DATABASE / ANALYTICS / COPILOT
+# AUTHENTICATION INITIALIZATION
 # ============================================================
 
-data = RetailData(DATA_DIR)
+initialize_auth()
 
-analytics = RetailAnalytics(data)
-
-copilot = StoreSenseCopilot(analytics)
+security = HTTPBearer(
+    auto_error=False
+)
 
 
 # ============================================================
@@ -48,6 +75,114 @@ app = FastAPI(
 
 
 # ============================================================
+# AUTHENTICATION DEPENDENCY
+# ============================================================
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        security
+    ),
+):
+    """
+    Validate the Bearer token and return the authenticated user.
+    """
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required.",
+        )
+
+    user = get_user_from_token(
+        credentials.credentials
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired authentication token.",
+        )
+
+    return user
+
+
+# ============================================================
+# USER ID HELPER
+# ============================================================
+
+def get_user_id(user) -> str:
+    """
+    Safely extract the authenticated user's ID.
+
+    StoreSense authentication data may expose the identifier
+    as either 'user_id' or 'id'.
+
+    The database layer always receives the final string ID.
+    """
+
+    user_id = (
+        user.get("user_id")
+        if isinstance(user, dict)
+        else None
+    )
+
+    if user_id is None and isinstance(user, dict):
+        user_id = user.get("id")
+
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authenticated user ID is missing.",
+        )
+
+    user_id = str(user_id).strip()
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authenticated user ID is invalid.",
+        )
+
+    return user_id
+
+
+# ============================================================
+# USER-SCOPED DATA DEPENDENCY
+# ============================================================
+
+def get_user_data(
+    user=Depends(get_current_user),
+) -> RetailData:
+    """
+    Create a RetailData instance scoped to the authenticated user.
+
+    Every database query performed through this object is isolated
+    to this user's owner_user_id.
+    """
+
+    user_id = get_user_id(user)
+
+    return RetailData(
+        owner_user_id=user_id,
+        data_dir=DATA_DIR,
+    )
+
+
+# ============================================================
+# USER-SCOPED ANALYTICS DEPENDENCY
+# ============================================================
+
+def get_user_analytics(
+    data: RetailData = Depends(get_user_data),
+) -> RetailAnalytics:
+    """
+    Create analytics using only the authenticated user's data.
+    """
+
+    return RetailAnalytics(data)
+
+
+# ============================================================
 # STATIC FRONTEND
 # ============================================================
 
@@ -59,46 +194,19 @@ app.mount(
 
 
 # ============================================================
-# FRONTEND PAGES
-# ============================================================
-
-@app.get("/", include_in_schema=False)
-def index():
-    """Main StoreSense dashboard."""
-    return FileResponse(FRONTEND_DIR / "index.html")
-
-
-@app.get("/mobile", include_in_schema=False)
-def mobile():
-    """Mobile / Quick Sale interface."""
-    return FileResponse(FRONTEND_DIR / "mobile.html")
-
-
-@app.get("/data-center", include_in_schema=False)
-def data_center():
-    """Retail data management page."""
-    return FileResponse(FRONTEND_DIR / "data-center.html")
-
-
-@app.get("/analytics", include_in_schema=False)
-def analytics_page():
-    return FileResponse(FRONTEND_DIR / "index.html")
-
-
-@app.get("/attention", include_in_schema=False)
-def attention_page():
-    return FileResponse(FRONTEND_DIR / "index.html")
-
-
-
-@app.get("/inventory", include_in_schema=False)
-def inventory_page():
-    """Dedicated Inventory Control Center."""
-    return FileResponse(FRONTEND_DIR / "inventory.html")
-
-# ============================================================
 # REQUEST MODELS
 # ============================================================
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=1)
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=1)
+    email: str = Field(min_length=3)
+    password: str = Field(min_length=6)
+
 
 class StoreCreate(BaseModel):
     store_id: str = Field(min_length=1)
@@ -110,7 +218,10 @@ class ProductCreate(BaseModel):
     product_id: str = Field(min_length=1)
     product_name: str = Field(min_length=1)
     category: str = ""
-    price: float = Field(default=0, ge=0)
+    price: float = Field(
+        default=0,
+        ge=0,
+    )
 
 
 class InventoryUpdate(BaseModel):
@@ -124,7 +235,10 @@ class SaleCreate(BaseModel):
     store_id: str = Field(min_length=1)
     product_id: str = Field(min_length=1)
     units_sold: int = Field(gt=0)
-    revenue: float | None = Field(default=None, ge=0)
+    revenue: float | None = Field(
+        default=None,
+        ge=0,
+    )
 
 
 class CopilotRequest(BaseModel):
@@ -132,24 +246,258 @@ class CopilotRequest(BaseModel):
 
 
 # ============================================================
+# FRONTEND PAGES
+# ============================================================
+
+@app.get(
+    "/",
+    include_in_schema=False,
+)
+def index():
+    """
+    Initial StoreSense entry point.
+
+    The application starts at the login page.
+    """
+
+    return FileResponse(
+        FRONTEND_DIR / "login.html"
+    )
+
+
+@app.get(
+    "/login",
+    include_in_schema=False,
+)
+def login_page():
+
+    return FileResponse(
+        FRONTEND_DIR / "login.html"
+    )
+
+
+@app.get(
+    "/signin",
+    include_in_schema=False,
+)
+def signin_page():
+
+    return FileResponse(
+        FRONTEND_DIR / "signin.html"
+    )
+
+
+@app.get(
+    "/dashboard",
+    include_in_schema=False,
+)
+def dashboard():
+
+    return FileResponse(
+        FRONTEND_DIR / "index.html"
+    )
+
+
+@app.get(
+    "/mobile",
+    include_in_schema=False,
+)
+def mobile():
+
+    return FileResponse(
+        FRONTEND_DIR / "mobile.html"
+    )
+
+
+@app.get(
+    "/data-center",
+    include_in_schema=False,
+)
+def data_center():
+
+    return FileResponse(
+        FRONTEND_DIR / "data-center.html"
+    )
+
+
+@app.get(
+    "/analytics",
+    include_in_schema=False,
+)
+def analytics_page():
+
+    return FileResponse(
+        FRONTEND_DIR / "index.html"
+    )
+
+
+@app.get(
+    "/attention",
+    include_in_schema=False,
+)
+def attention_page():
+
+    return FileResponse(
+        FRONTEND_DIR / "index.html"
+    )
+
+
+@app.get(
+    "/inventory",
+    include_in_schema=False,
+)
+def inventory_page():
+
+    return FileResponse(
+        FRONTEND_DIR / "inventory.html"
+    )
+
+
+# ============================================================
+# AUTHENTICATION APIs
+# ============================================================
+
+@app.post("/api/auth/register")
+def register(
+    payload: RegisterRequest,
+):
+    """
+    Create a new StoreSense manager account.
+
+    Registration automatically logs the user in.
+    """
+
+    try:
+
+        name = payload.name.strip()
+
+        email = payload.email.strip().lower()
+
+        if not name:
+            raise ValueError(
+                "Full name is required."
+            )
+
+        if not email:
+            raise ValueError(
+                "Email is required."
+            )
+
+        user = create_user(
+            email=email,
+            password=payload.password,
+            full_name=name,
+            role="manager",
+        )
+
+        token = create_access_token(user)
+
+        return {
+            "ok": True,
+            "message": "Account created successfully.",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": public_user(user),
+        }
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
+
+@app.post("/api/auth/login")
+def login(
+    payload: LoginRequest,
+):
+    """
+    Authenticate a StoreSense user.
+    """
+
+    email = payload.email.strip().lower()
+
+    user = authenticate_user(
+        email=email,
+        password=payload.password,
+    )
+
+    if user is None:
+
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password.",
+        )
+
+    token = create_access_token(user)
+
+    return {
+        "ok": True,
+        "message": "Login successful.",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": public_user(user),
+    }
+
+
+@app.get("/api/auth/me")
+def current_user(
+    user=Depends(get_current_user),
+):
+    """
+    Return the currently authenticated user.
+    """
+
+    return {
+        "ok": True,
+        "user": public_user(user),
+    }
+
+
+@app.post("/api/auth/logout")
+def logout(
+    user=Depends(get_current_user),
+):
+    """
+    JWT authentication is stateless.
+
+    The frontend removes the stored token.
+    """
+
+    return {
+        "ok": True,
+        "message": "Logged out successfully.",
+    }
+
+
+# ============================================================
 # DASHBOARD APIs
 # ============================================================
 
 @app.get("/api/summary")
-def summary():
+def summary(
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
+):
     """
-    Return dashboard KPIs and summary metrics.
+    Return dashboard KPIs for the authenticated user only.
     """
 
     try:
+
         return analytics.summary()
 
     except Exception as exc:
 
-        print("Summary endpoint error:", repr(exc))
+        print(
+            "Summary endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -158,15 +506,14 @@ def summary():
 
 
 @app.get("/api/attention")
-def attention():
+def attention(
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
+):
     """
-    Return retail attention signals.
-
-    Examples:
-    - likely stock-outs
-    - slow/non-moving inventory
-    - sales spikes
-    - sales drops
+    Return retail attention signals for the authenticated
+    user only.
     """
 
     try:
@@ -178,10 +525,13 @@ def attention():
 
     except Exception as exc:
 
-        print("Attention endpoint error:", repr(exc))
+        print(
+            "Attention endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "items": [],
                 "error": str(exc),
@@ -194,12 +544,13 @@ def attention():
 def evidence(
     product_id: str,
     store_id: str | None = None,
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
 ):
     """
-    Return evidence for a specific product.
-
-    Every AI claim should ultimately be traceable
-    to real data returned by the analytics layer.
+    Return evidence for a specific product belonging to
+    the authenticated user.
     """
 
     try:
@@ -212,7 +563,7 @@ def evidence(
         if result is None:
 
             return JSONResponse(
-                {
+                content={
                     "ok": False,
                     "error": "Product not found.",
                 },
@@ -226,10 +577,13 @@ def evidence(
 
     except Exception as exc:
 
-        print("Evidence endpoint error:", repr(exc))
+        print(
+            "Evidence endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -242,24 +596,35 @@ def evidence(
 # ============================================================
 
 @app.get("/api/products")
-def products():
-    """Return all products."""
+def products(
+    data: RetailData = Depends(get_user_data),
+):
+    """
+    Return products belonging to the authenticated user only.
+    """
 
     try:
 
+        product_records = data.products.to_dict(
+            orient="records"
+        )
+
         return {
             "ok": True,
-            "products": data.products.to_dict(
-                orient="records"
+            "products": jsonable_encoder(
+                product_records
             ),
         }
 
     except Exception as exc:
 
-        print("Products endpoint error:", repr(exc))
+        print(
+            "Products endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "products": [],
                 "error": str(exc),
@@ -269,8 +634,13 @@ def products():
 
 
 @app.post("/api/products")
-def create_product(payload: ProductCreate):
-    """Create a new product."""
+def create_product(
+    payload: ProductCreate,
+    data: RetailData = Depends(get_user_data),
+):
+    """
+    Create a product owned by the authenticated user.
+    """
 
     try:
 
@@ -284,13 +654,13 @@ def create_product(payload: ProductCreate):
         return {
             "ok": True,
             "message": "Product added successfully.",
-            "product": product,
+            "product": jsonable_encoder(product),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -303,24 +673,35 @@ def create_product(payload: ProductCreate):
 # ============================================================
 
 @app.get("/api/stores")
-def stores():
-    """Return all stores."""
+def stores(
+    data: RetailData = Depends(get_user_data),
+):
+    """
+    Return stores belonging to the authenticated user only.
+    """
 
     try:
 
+        store_records = data.stores.to_dict(
+            orient="records"
+        )
+
         return {
             "ok": True,
-            "stores": data.stores.to_dict(
-                orient="records"
+            "stores": jsonable_encoder(
+                store_records
             ),
         }
 
     except Exception as exc:
 
-        print("Stores endpoint error:", repr(exc))
+        print(
+            "Stores endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "stores": [],
                 "error": str(exc),
@@ -330,8 +711,13 @@ def stores():
 
 
 @app.post("/api/stores")
-def create_store(payload: StoreCreate):
-    """Create a new retail store."""
+def create_store(
+    payload: StoreCreate,
+    data: RetailData = Depends(get_user_data),
+):
+    """
+    Create a store owned by the authenticated user.
+    """
 
     try:
 
@@ -344,13 +730,13 @@ def create_store(payload: StoreCreate):
         return {
             "ok": True,
             "message": "Store added successfully.",
-            "store": store,
+            "store": jsonable_encoder(store),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -365,9 +751,10 @@ def create_store(payload: StoreCreate):
 @app.get("/api/inventory")
 def inventory(
     store_id: str | None = None,
+    data: RetailData = Depends(get_user_data),
 ):
     """
-    Return inventory.
+    Return inventory belonging to the authenticated user.
 
     Optional:
         ?store_id=STORE001
@@ -375,19 +762,24 @@ def inventory(
 
     try:
 
+        items = data.inventory_list(
+            store_id=store_id
+        )
+
         return {
             "ok": True,
-            "items": data.inventory_list(
-                store_id=store_id
-            ),
+            "items": jsonable_encoder(items),
         }
 
     except Exception as exc:
 
-        print("Inventory endpoint error:", repr(exc))
+        print(
+            "Inventory endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "items": [],
                 "error": str(exc),
@@ -399,8 +791,12 @@ def inventory(
 @app.put("/api/inventory")
 def update_inventory(
     payload: InventoryUpdate,
+    data: RetailData = Depends(get_user_data),
 ):
-    """Manually adjust inventory."""
+    """
+    Update inventory only for a store/product owned by
+    the authenticated user.
+    """
 
     try:
 
@@ -414,13 +810,13 @@ def update_inventory(
         return {
             "ok": True,
             "message": "Inventory updated successfully.",
-            "inventory": result,
+            "inventory": jsonable_encoder(result),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -435,15 +831,17 @@ def update_inventory(
 @app.post("/api/sales")
 def record_sale(
     payload: SaleCreate,
+    data: RetailData = Depends(get_user_data),
 ):
     """
-    Record a retail sale.
+    Record a sale belonging to the authenticated user.
 
     Database layer handles:
-    1. stock validation
-    2. sale recording
-    3. inventory reduction
-    4. inventory history
+        1. ownership validation
+        2. stock validation
+        3. sale recording
+        4. inventory reduction
+        5. inventory history
     """
 
     try:
@@ -458,13 +856,13 @@ def record_sale(
         return {
             "ok": True,
             "message": "Sale recorded successfully.",
-            "sale": result,
+            "sale": jsonable_encoder(result),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -479,22 +877,27 @@ def record_sale(
 @app.get("/api/mobile/products")
 def mobile_products(
     store_id: str | None = None,
+    data: RetailData = Depends(get_user_data),
 ):
-    """Return products for mobile / Quick Sale."""
+    """
+    Return mobile products belonging to the authenticated user.
+    """
 
     try:
 
+        products = data.mobile_products(
+            store_id=store_id
+        )
+
         return {
             "ok": True,
-            "products": data.mobile_products(
-                store_id=store_id
-            ),
+            "products": jsonable_encoder(products),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "products": [],
                 "error": str(exc),
@@ -506,22 +909,27 @@ def mobile_products(
 @app.get("/api/mobile/inventory")
 def mobile_inventory(
     store_id: str | None = None,
+    data: RetailData = Depends(get_user_data),
 ):
-    """Return inventory for the mobile interface."""
+    """
+    Return mobile inventory belonging to the authenticated user.
+    """
 
     try:
 
+        items = data.inventory_list(
+            store_id=store_id
+        )
+
         return {
             "ok": True,
-            "items": data.inventory_list(
-                store_id=store_id
-            ),
+            "items": jsonable_encoder(items),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "items": [],
                 "error": str(exc),
@@ -533,8 +941,11 @@ def mobile_inventory(
 @app.post("/api/mobile/sale")
 def mobile_sale(
     payload: SaleCreate,
+    data: RetailData = Depends(get_user_data),
 ):
-    """Record a mobile / Quick Sale."""
+    """
+    Record a mobile / Quick Sale for the authenticated user.
+    """
 
     try:
 
@@ -548,13 +959,13 @@ def mobile_sale(
         return {
             "ok": True,
             "message": "Sale recorded successfully.",
-            "sale": result,
+            "sale": jsonable_encoder(result),
         }
 
     except Exception as exc:
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "error": str(exc),
             },
@@ -569,15 +980,19 @@ def mobile_sale(
 @app.post("/api/copilot")
 def ask_copilot(
     payload: CopilotRequest,
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
 ):
     """
-    Ask StoreSense AI Copilot.
+    Ask StoreSense AI Copilot using ONLY the authenticated
+    user's retail data.
 
     User question
           ↓
     Intent detection
           ↓
-    Python analytics
+    User-scoped Python analytics
           ↓
     Evidence packet
           ↓
@@ -598,16 +1013,29 @@ def ask_copilot(
 
     try:
 
-        result = copilot.answer(question)
+        # IMPORTANT:
+        # A fresh Copilot is created using this user's
+        # user-scoped analytics object.
 
-        return result
+        user_copilot = StoreSenseCopilot(
+            analytics
+        )
+
+        result = user_copilot.answer(
+            question
+        )
+
+        return jsonable_encoder(result)
 
     except Exception as exc:
 
-        print("Copilot endpoint error:", repr(exc))
+        print(
+            "Copilot endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "answer": (
                     "The Copilot could not complete the request "
@@ -621,51 +1049,99 @@ def ask_copilot(
 
 
 # ============================================================
-# DATABASE / SYSTEM HEALTH
+# PUBLIC SYSTEM HEALTH
 # ============================================================
 
 @app.get("/api/health")
 def health():
     """
-    Basic system health.
+    Basic public system health.
 
-    Checks:
-    - database
-    - Gemini configuration
+    This endpoint does NOT access user-specific retail data.
+
+    It only checks:
+        - PostgreSQL connectivity
+        - Gemini API key configuration
     """
 
-    try:
+    database_ok = False
+    database_error = None
 
-        database_ok = data.health_check()
+    database_url = (
+        os.getenv(
+            "DATABASE_URL",
+            "",
+        )
+        .strip()
+    )
 
-        return {
-            "status": "ok" if database_ok else "error",
-            "database": "Neon PostgreSQL",
-            "neon_connected": database_ok,
-            "gemini_configured": bool(
-                os.getenv("GEMINI_API_KEY")
-            ),
-        }
+    if database_url:
 
-    except Exception as exc:
+        try:
 
-        print("Health endpoint error:", repr(exc))
+            with psycopg.connect(
+                database_url,
+                connect_timeout=10,
+            ) as conn:
 
-        return {
-            "status": "error",
-            "database": "Neon PostgreSQL",
-            "neon_connected": False,
-            "gemini_configured": bool(
-                os.getenv("GEMINI_API_KEY")
-            ),
-            "error": str(exc),
-        }
+                with conn.cursor() as cur:
 
+                    cur.execute(
+                        "SELECT 1"
+                    )
+
+                    cur.fetchone()
+
+            database_ok = True
+
+        except Exception as exc:
+
+            database_error = str(exc)
+
+    else:
+
+        database_error = (
+            "DATABASE_URL is not configured."
+        )
+
+    gemini_configured = bool(
+        os.getenv("GEMINI_API_KEY")
+    )
+
+    result = {
+        "status": (
+            "ok"
+            if database_ok
+            else "error"
+        ),
+
+        "database":
+            "Neon PostgreSQL",
+
+        "database_connected":
+            database_ok,
+
+        "gemini_configured":
+            gemini_configured,
+    }
+
+    if database_error:
+        result["database_error"] = database_error
+
+    return result
+
+
+# ============================================================
+# DATABASE STATUS
+# ============================================================
 
 @app.get("/api/database")
-def database_status():
+def database_status(
+    data: RetailData = Depends(get_user_data),
+):
     """
-    Return database connection and record counts.
+    Return database connection information and record counts
+    for the authenticated user only.
     """
 
     try:
@@ -676,15 +1152,19 @@ def database_status():
             "ok": True,
             "database": "Neon PostgreSQL",
             "connected": True,
+            "owner_user_id": data.owner_user_id,
             "counts": counts,
         }
 
     except Exception as exc:
 
-        print("Database endpoint error:", repr(exc))
+        print(
+            "Database endpoint error:",
+            repr(exc),
+        )
 
         return JSONResponse(
-            {
+            content={
                 "ok": False,
                 "database": "Neon PostgreSQL",
                 "connected": False,
@@ -699,10 +1179,14 @@ def database_status():
 # ============================================================
 
 @app.get("/api/sales/trend")
-def sales_trend():
+def sales_trend(
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
+):
     """
-    Return daily revenue and units sold
-    for the latest 30 days.
+    Return daily revenue and units sold for the latest
+    30 days for the authenticated user.
     """
 
     try:
@@ -761,11 +1245,17 @@ def sales_trend():
             sales
             .groupby(
                 "date",
-                as_index=False
+                as_index=False,
             )
             .agg(
-                revenue=("revenue", "sum"),
-                units_sold=("units_sold", "sum"),
+                revenue=(
+                    "revenue",
+                    "sum",
+                ),
+                units_sold=(
+                    "units_sold",
+                    "sum",
+                ),
             )
             .sort_values("date")
         )
@@ -781,16 +1271,21 @@ def sales_trend():
 
             "points": [
                 {
-                    "date": str(row["date"]),
+                    "date": str(
+                        row["date"]
+                    ),
+
                     "revenue": float(
                         row["revenue"] or 0
                     ),
+
                     "units_sold": int(
                         row["units_sold"] or 0
                     ),
                 }
 
-                for _, row in daily.iterrows()
+                for _, row
+                in daily.iterrows()
             ],
 
             "total_revenue": float(
@@ -806,7 +1301,7 @@ def sales_trend():
 
         print(
             "Sales trend endpoint error:",
-            repr(exc)
+            repr(exc),
         )
 
         raise HTTPException(
@@ -822,13 +1317,18 @@ def sales_trend():
 # ============================================================
 
 @app.get("/api/performance")
-def performance():
+def performance(
+    analytics: RetailAnalytics = Depends(
+        get_user_analytics
+    ),
+):
     """
-    Return dashboard business-performance data.
+    Return business-performance data for the authenticated
+    user only.
 
     Includes:
-    - last 30 days revenue trend
-    - inventory health
+        - last 30 days revenue trend
+        - inventory health
     """
 
     try:
@@ -845,7 +1345,6 @@ def performance():
 
             sales = sales.copy()
 
-            # Normalize timestamps safely
             sales["date"] = pd.to_datetime(
                 sales["date"],
                 errors="coerce",
@@ -858,7 +1357,6 @@ def performance():
 
             if not sales.empty:
 
-                # Last 30 days
                 cutoff = (
                     pd.Timestamp.now(tz="UTC")
                     - pd.Timedelta(days=29)
@@ -880,12 +1378,12 @@ def performance():
                         recent
                         .groupby(
                             "day",
-                            as_index=False
+                            as_index=False,
                         )
                         .agg(
                             revenue=(
                                 "revenue",
-                                "sum"
+                                "sum",
                             )
                         )
                         .sort_values("day")
@@ -893,7 +1391,10 @@ def performance():
 
                     revenue = [
                         {
-                            "date": str(row["day"]),
+                            "date": str(
+                                row["day"]
+                            ),
+
                             "revenue": float(
                                 row["revenue"] or 0
                             ),
@@ -907,10 +1408,11 @@ def performance():
         # INVENTORY HEALTH
         # ====================================================
 
-        inventory = analytics._latest_inventory()
+        inventory = (
+            analytics._latest_inventory()
+        )
 
         if inventory is None:
-
             inventory = pd.DataFrame()
 
         inventory = inventory.copy()
@@ -918,7 +1420,9 @@ def performance():
         total = len(inventory)
 
         stockout = 0
+
         low_stock = 0
+
         slow_moving = 0
 
         # ----------------------------------------------------
@@ -928,6 +1432,7 @@ def performance():
         if total > 0:
 
             # Stock-out
+
             stockout = int(
                 (
                     inventory["stock"] <= 0
@@ -935,6 +1440,7 @@ def performance():
             )
 
             # Low stock: 1–5 units
+
             low_stock = int(
                 (
                     (inventory["stock"] > 0)
@@ -944,10 +1450,11 @@ def performance():
             )
 
             # Slow / non-moving
+
             try:
 
-                attention_items = analytics.attention(
-                    30
+                attention_items = (
+                    analytics.attention(30)
                 )
 
                 if not attention_items:
@@ -969,7 +1476,7 @@ def performance():
 
                 print(
                     "Slow-moving calculation error:",
-                    repr(attention_error)
+                    repr(attention_error),
                 )
 
                 slow_moving = 0
@@ -1008,7 +1515,7 @@ def performance():
 
         print(
             "Performance endpoint error:",
-            repr(exc)
+            repr(exc),
         )
 
         raise HTTPException(
@@ -1027,6 +1534,8 @@ def performance():
 def api_info():
     """
     Simple API discovery endpoint.
+
+    Kept public.
     """
 
     return {
@@ -1040,27 +1549,62 @@ def api_info():
 
         "status": "running",
 
+        "authentication": {
+            "type": "JWT Bearer Token",
+            "register": "/api/auth/register",
+            "login": "/api/auth/login",
+            "current_user": "/api/auth/me",
+            "logout": "/api/auth/logout",
+        },
+
+        "data_isolation": {
+            "enabled": True,
+            "description": (
+                "Retail data is isolated using the authenticated "
+                "user owner_user_id."
+            ),
+        },
+
         "endpoints": {
 
-            "dashboard": "/",
+            "initial_entry": "/",
+
+            "login": "/login",
+
+            "signin": "/signin",
+
+            "dashboard": "/dashboard",
 
             "mobile": "/mobile",
 
             "data_center": "/data-center",
 
-            "summary": "/api/summary",
+            "analytics": "/analytics",
 
-            "attention": "/api/attention",
+            "attention_page": "/attention",
 
-            "evidence": "/api/evidence/{product_id}",
+            "inventory_page": "/inventory",
 
-            "products": "/api/products",
+            "summary":
+                "/api/summary",
 
-            "stores": "/api/stores",
+            "attention":
+                "/api/attention",
 
-            "inventory": "/api/inventory",
+            "evidence":
+                "/api/evidence/{product_id}",
 
-            "sales": "/api/sales",
+            "products":
+                "/api/products",
+
+            "stores":
+                "/api/stores",
+
+            "inventory":
+                "/api/inventory",
+
+            "sales":
+                "/api/sales",
 
             "mobile_products":
                 "/api/mobile/products",
@@ -1071,11 +1615,14 @@ def api_info():
             "mobile_sale":
                 "/api/mobile/sale",
 
-            "copilot": "/api/copilot",
+            "copilot":
+                "/api/copilot",
 
-            "health": "/api/health",
+            "health":
+                "/api/health",
 
-            "database": "/api/database",
+            "database":
+                "/api/database",
 
             "sales_trend":
                 "/api/sales/trend",

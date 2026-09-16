@@ -3,6 +3,68 @@
    Frontend Controller
    ========================================================= */
 
+"use strict";
+
+/* =========================================================
+   AUTHENTICATION
+   ========================================================= */
+
+function getAuthToken() {
+    return localStorage.getItem("storesense_access_token");
+}
+
+
+async function authFetch(url, options = {}) {
+
+    const token = getAuthToken();
+
+    if (!token) {
+        window.location.replace("/login");
+        throw new Error("Authentication required.");
+    }
+
+    const headers = new Headers(options.headers || {});
+
+    headers.set(
+        "Authorization",
+        `Bearer ${token}`
+    );
+
+    if (!headers.has("Accept")) {
+        headers.set(
+            "Accept",
+            "application/json"
+        );
+    }
+
+    const response = await fetch(
+        url,
+        {
+            ...options,
+            headers
+        }
+    );
+
+    if (response.status === 401) {
+
+        localStorage.removeItem(
+            "storesense_access_token"
+        );
+
+        localStorage.removeItem(
+            "storesense_user"
+        );
+
+        window.location.replace("/login");
+
+        throw new Error(
+            "Your session has expired."
+        );
+    }
+
+    return response;
+}
+
 
 /* =========================================================
    API HELPER
@@ -10,15 +72,41 @@
 
 async function getJSON(url, options = {}) {
 
-    const response = await fetch(url, options);
+    const response =
+        await authFetch(url, options);
 
     if (!response.ok) {
 
-        const errorText = await response.text();
+        let errorMessage =
+            `Request failed: ${response.status}`;
 
-        throw new Error(
-            errorText || `Request failed: ${response.status}`
-        );
+        try {
+
+            const errorData =
+                await response.json();
+
+            errorMessage =
+                errorData.detail ||
+                errorData.message ||
+                errorMessage;
+
+        } catch {
+
+            try {
+
+                const errorText =
+                    await response.text();
+
+                if (errorText) {
+                    errorMessage = errorText;
+                }
+
+            } catch {
+                /* Ignore response parsing failure */
+            }
+        }
+
+        throw new Error(errorMessage);
     }
 
     return response.json();
@@ -40,22 +128,23 @@ async function load() {
             performance
         ] = await Promise.all([
 
-            getJSON('/api/summary'),
+            getJSON("/api/summary"),
 
-            getJSON('/api/attention'),
+            getJSON("/api/attention"),
 
-            getJSON('/api/health'),
+            getJSON("/api/health"),
 
-            getJSON('/api/performance')
+            getJSON("/api/performance")
 
         ]);
-
 
         updateConnectionStatus(health);
 
         renderSummary(summary);
 
-        renderAttention(attention.items || []);
+        renderAttention(
+            attention.items || []
+        );
 
         renderPerformance(performance);
 
@@ -64,14 +153,12 @@ async function load() {
     catch (error) {
 
         console.error(
-            'StoreSense startup error:',
+            "StoreSense startup error:",
             error
         );
 
-
         const status =
-            document.getElementById('status');
-
+            document.getElementById("status");
 
         if (status) {
 
@@ -82,22 +169,22 @@ async function load() {
 
         }
 
-
         const sidebarStatus =
-            document.getElementById('sidebarStatus');
-
+            document.getElementById(
+                "sidebarStatus"
+            );
 
         if (sidebarStatus) {
 
             sidebarStatus.textContent =
-                'Connection error';
+                "Connection error";
 
         }
 
-
         const attention =
-            document.getElementById('attentionList');
-
+            document.getElementById(
+                "attentionList"
+            );
 
         if (attention) {
 
@@ -124,9 +211,7 @@ async function load() {
 
         }
 
-
         showPerformanceFallback();
-
     }
 }
 
@@ -143,10 +228,8 @@ function updateConnectionStatus(health) {
             health.gemini_configured
         );
 
-
     const status =
-        document.getElementById('status');
-
+        document.getElementById("status");
 
     if (status) {
 
@@ -154,39 +237,32 @@ function updateConnectionStatus(health) {
 
             <span class="status-dot ${
                 geminiConnected
-                    ? 'online'
-                    : 'offline'
+                    ? "online"
+                    : "offline"
             }"></span>
 
             ${
                 geminiConnected
-                    ? 'Gemini connected'
-                    : 'Local analytics mode'
+                    ? "Gemini connected"
+                    : "Local analytics mode"
             }
 
         `;
 
     }
 
-
     const sidebarStatus =
         document.getElementById(
-            'sidebarStatus'
+            "sidebarStatus"
         );
-
 
     if (sidebarStatus) {
 
         sidebarStatus.textContent =
-
             geminiConnected
-
-                ? 'All systems operational'
-
-                : 'Analytics available';
-
+                ? "All systems operational"
+                : "Analytics available";
     }
-
 }
 
 
@@ -199,15 +275,15 @@ function money(value) {
     const amount =
         Number(value || 0);
 
-
-    return '₹' +
+    return (
+        "₹" +
         amount.toLocaleString(
-            'en-IN',
+            "en-IN",
             {
                 maximumFractionDigits: 0
             }
-        );
-
+        )
+    );
 }
 
 
@@ -217,12 +293,8 @@ function money(value) {
 
 function number(value) {
 
-    return Number(
-        value || 0
-    ).toLocaleString(
-        'en-IN'
-    );
-
+    return Number(value || 0)
+        .toLocaleString("en-IN");
 }
 
 
@@ -233,70 +305,55 @@ function number(value) {
 function renderSummary(summary) {
 
     const container =
-        document.getElementById(
-            'summary'
-        );
-
+        document.getElementById("summary");
 
     if (!container) {
         return;
     }
 
-
     const cards = [
 
         {
-            label: 'Revenue (30d)',
-            value: money(
-                summary.revenue_30d
-            ),
-            icon: '₹',
-            className: 'revenue',
-            target: 'performance'
+            label: "Revenue (30d)",
+            value: money(summary.revenue_30d),
+            icon: "₹",
+            className: "revenue",
+            target: "performance"
         },
 
         {
-            label: 'Units sold',
-            value: number(
-                summary.units_30d
-            ),
-            icon: '↗',
-            className: 'units',
-            target: 'performance'
+            label: "Units sold",
+            value: number(summary.units_30d),
+            icon: "↗",
+            className: "units",
+            target: "performance"
         },
 
         {
-            label: 'Sales records',
-            value: number(
-                summary.orders_30d
-            ),
-            icon: '▤',
-            className: 'orders',
-            target: 'performance'
+            label: "Sales records",
+            value: number(summary.orders_30d),
+            icon: "▤",
+            className: "orders",
+            target: "performance"
         },
 
         {
-            label: 'Products',
-            value: number(
-                summary.products
-            ),
-            icon: '▦',
-            className: 'products',
-            target: 'products'
+            label: "Products",
+            value: number(summary.products),
+            icon: "▦",
+            className: "products",
+            target: "products"
         },
 
         {
-            label: 'Attention items',
-            value: number(
-                summary.attention_count
-            ),
-            icon: '⚠',
-            className: 'attention-count',
-            target: 'attention'
+            label: "Attention items",
+            value: number(summary.attention_count),
+            icon: "⚠",
+            className: "attention-count",
+            target: "attention"
         }
 
     ];
-
 
     container.innerHTML =
         cards.map(
@@ -331,8 +388,8 @@ function renderSummary(summary) {
                 </button>
 
             `
-        ).join('');
-
+        )
+        .join("");
 }
 
 
@@ -342,33 +399,30 @@ function renderSummary(summary) {
 
 function handleKPIClick(target) {
 
-    if (target === 'performance') {
+    if (target === "performance") {
 
         scrollToSection(
-            'business-performance'
+            "business-performance"
         );
 
         return;
     }
 
-
-    if (target === 'attention') {
+    if (target === "attention") {
 
         scrollToSection(
-            'attention'
+            "attention"
         );
 
         return;
     }
 
-
-    if (target === 'products') {
+    if (target === "products") {
 
         window.location.href =
-            '/products';
+            "/inventory";
 
     }
-
 }
 
 
@@ -381,17 +435,14 @@ function scrollToSection(id) {
     const section =
         document.getElementById(id);
 
-
     if (!section) {
         return;
     }
 
-
     section.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
+        behavior: "smooth",
+        block: "start"
     });
-
 }
 
 
@@ -403,14 +454,12 @@ function renderAttention(items) {
 
     const container =
         document.getElementById(
-            'attentionList'
+            "attentionList"
         );
-
 
     if (!container) {
         return;
     }
-
 
     if (!items || items.length === 0) {
 
@@ -438,61 +487,58 @@ function renderAttention(items) {
         return;
     }
 
-
     container.innerHTML =
         items.map(
-            (item, index) => {
+            item => {
 
                 const priority =
                     String(
                         item.priority ||
-                        'MEDIUM'
+                        "MEDIUM"
                     ).toLowerCase();
-
 
                 const title =
                     escapeHTML(
                         item.title ||
-                        'Attention'
+                        "Attention"
                     );
-
 
                 const product =
                     escapeHTML(
                         item.product ||
                         item.product_name ||
-                        'Unknown product'
+                        "Unknown product"
                     );
-
 
                 const store =
                     escapeHTML(
                         item.store ||
                         item.store_name ||
-                        'Unknown store'
+                        "Unknown store"
                     );
-
 
                 const message =
                     escapeHTML(
                         item.message ||
                         item.reason ||
-                        ''
+                        ""
                     );
-
 
                 const action =
                     escapeHTML(
                         item.action ||
-                        'Review this item.'
+                        "Review this item."
                     );
-
 
                 const evidence =
                     item.evidence ||
                     item.metrics ||
                     {};
 
+                const evidenceJSON =
+                    safeJSONStringify(
+                        evidence
+                    );
 
                 return `
 
@@ -500,18 +546,15 @@ function renderAttention(items) {
                         class="attention ${priority}"
                         tabindex="0"
                         role="button"
-                        onclick="showEvidence(${safeJSONStringify(evidence)})"
-                        onkeydown="handleAttentionKey(event, ${safeJSONStringify(evidence)})"
+                        onclick="showEvidence(${evidenceJSON})"
+                        onkeydown="handleAttentionKey(event, ${evidenceJSON})"
                     >
 
                         <div class="attention-main">
 
                             <div class="attention-icon">
-                                ${getAttentionIcon(
-                                    item.type
-                                )}
+                                ${getAttentionIcon(item.type)}
                             </div>
-
 
                             <div class="attention-content">
 
@@ -525,23 +568,20 @@ function renderAttention(items) {
                                         ${escapeHTML(
                                             String(
                                                 item.priority ||
-                                                'MEDIUM'
+                                                "MEDIUM"
                                             )
                                         )}
                                     </span>
 
                                 </div>
 
-
                                 <div class="attention-location">
                                     ${store}
                                 </div>
 
-
                                 <p class="attention-message">
                                     ${message}
                                 </p>
-
 
                                 <div class="attention-action">
 
@@ -555,11 +595,10 @@ function renderAttention(items) {
 
                                 </div>
 
-
                                 <button
                                     type="button"
                                     class="evidence-btn"
-                                    onclick="event.stopPropagation(); showEvidence(${safeJSONStringify(evidence)})"
+                                    onclick="event.stopPropagation(); showEvidence(${evidenceJSON})"
                                 >
 
                                     <span>
@@ -577,10 +616,9 @@ function renderAttention(items) {
                     </article>
 
                 `;
-
             }
-        ).join('');
-
+        )
+        .join("");
 }
 
 
@@ -594,16 +632,14 @@ function handleAttentionKey(
 ) {
 
     if (
-        event.key === 'Enter' ||
-        event.key === ' '
+        event.key === "Enter" ||
+        event.key === " "
     ) {
 
         event.preventDefault();
 
         showEvidence(evidence);
-
     }
-
 }
 
 
@@ -614,49 +650,36 @@ function handleAttentionKey(
 function getAttentionIcon(type) {
 
     switch (
-        String(type || '').toLowerCase()
+        String(type || "").toLowerCase()
     ) {
 
-        case 'stockout':
-        case 'stock-out':
-        case 'stock_out':
+        case "stockout":
+        case "stock-out":
+        case "stock_out":
+            return "⚠";
 
-            return '⚠';
+        case "slow_moving":
+        case "slow-moving":
+        case "slow":
+            return "◴";
 
+        case "non_moving":
+        case "non-moving":
+            return "◴";
 
-        case 'slow_moving':
-        case 'slow-moving':
-        case 'slow':
+        case "sales_drop":
+        case "sales-drop":
+        case "salesdrop":
+            return "↓";
 
-            return '◴';
-
-
-        case 'non_moving':
-        case 'non-moving':
-
-            return '◴';
-
-
-        case 'sales_drop':
-        case 'sales-drop':
-        case 'salesdrop':
-
-            return '↓';
-
-
-        case 'sales_spike':
-        case 'sales-spike':
-        case 'salesspike':
-
-            return '↗';
-
+        case "sales_spike":
+        case "sales-spike":
+        case "salesspike":
+            return "↗";
 
         default:
-
-            return '!';
-
+            return "!";
     }
-
 }
 
 
@@ -668,27 +691,23 @@ async function loadAttention() {
 
     const button =
         document.querySelector(
-            '.section-header .secondary-button'
+            ".section-header .secondary-button"
         );
-
 
     if (button) {
 
         button.disabled = true;
 
         button.textContent =
-            'Refreshing...';
-
+            "Refreshing...";
     }
-
 
     try {
 
         const data =
             await getJSON(
-                '/api/attention'
+                "/api/attention"
             );
-
 
         renderAttention(
             data.items || []
@@ -699,7 +718,7 @@ async function loadAttention() {
     catch (error) {
 
         console.error(
-            'Attention refresh error:',
+            "Attention refresh error:",
             error
         );
 
@@ -712,12 +731,9 @@ async function loadAttention() {
             button.disabled = false;
 
             button.innerHTML =
-                '↻ Refresh';
-
+                "↻ Refresh";
         }
-
     }
-
 }
 
 
@@ -734,26 +750,18 @@ function renderPerformance(data) {
         return;
     }
 
-
     const inventory =
         data.inventory || {};
 
-
-    /* -----------------------------------------------------
-       Revenue summary
-       ----------------------------------------------------- */
-
     const revenueElement =
         document.getElementById(
-            'performanceRevenue'
+            "performanceRevenue"
         );
-
 
     if (revenueElement) {
 
         const revenuePoints =
             data.revenue || [];
-
 
         const total =
             revenuePoints.reduce(
@@ -765,82 +773,55 @@ function renderPerformance(data) {
                 0
             );
 
-
         revenueElement.textContent =
             formatCurrency(total);
-
     }
 
-
-    /* -----------------------------------------------------
-       Inventory total
-       ----------------------------------------------------- */
-
     setText(
-        'inventoryTotal',
+        "inventoryTotal",
         number(inventory.total)
     );
 
-
-    /* -----------------------------------------------------
-       Healthy
-       ----------------------------------------------------- */
-
     setText(
-        'inventoryHealthy',
+        "inventoryHealthy",
         number(inventory.healthy)
     );
 
-
-    /* -----------------------------------------------------
-       Low stock
-       ----------------------------------------------------- */
-
     setText(
-        'inventoryLowStock',
+        "inventoryLowStock",
         number(inventory.low_stock)
     );
 
-
-    /* -----------------------------------------------------
-       Stock-out
-       ----------------------------------------------------- */
-
     setText(
-        'inventoryStockout',
+        "inventoryStockout",
         number(inventory.stockout)
     );
 
-
-    /* -----------------------------------------------------
-       Slow moving
-       ----------------------------------------------------- */
-
     setText(
-        'inventorySlowMoving',
+        "inventorySlowMoving",
         number(inventory.slow_moving)
     );
 
-
-    /* -----------------------------------------------------
-       Feed revenue into chart
-       ----------------------------------------------------- */
-
     renderSalesChart({
+
         ok: true,
 
         points:
             (data.revenue || []).map(
                 item => ({
+
                     date: item.date,
+
                     revenue:
                         Number(
                             item.revenue || 0
                         ),
+
                     units_sold:
                         Number(
                             item.units_sold || 0
                         )
+
                 })
             ),
 
@@ -855,15 +836,9 @@ function renderPerformance(data) {
             )
     });
 
-
-    /* -----------------------------------------------------
-       Update inventory health bars
-       ----------------------------------------------------- */
-
     updateInventoryHealthBars(
         inventory
     );
-
 }
 
 
@@ -876,14 +851,9 @@ function setText(id, value) {
     const element =
         document.getElementById(id);
 
-
     if (element) {
-
-        element.textContent =
-            value;
-
+        element.textContent = value;
     }
-
 }
 
 
@@ -900,11 +870,9 @@ function updateInventoryHealthBars(
             inventory.total || 0
         );
 
-
     if (total <= 0) {
         return;
     }
-
 
     const values = {
 
@@ -927,9 +895,7 @@ function updateInventoryHealthBars(
             Number(
                 inventory.slow_moving || 0
             )
-
     };
-
 
     Object.entries(values)
         .forEach(
@@ -944,7 +910,6 @@ function updateInventoryHealthBars(
                         100
                     );
 
-
                 const selectors = [
 
                     `#inventoryBar-${key}`,
@@ -952,7 +917,6 @@ function updateInventoryHealthBars(
                     `[data-inventory-bar="${key}"]`
 
                 ];
-
 
                 selectors.forEach(
                     selector => {
@@ -962,20 +926,15 @@ function updateInventoryHealthBars(
                                 selector
                             );
 
-
                         if (element) {
 
                             element.style.width =
                                 `${percentage}%`;
-
                         }
-
                     }
                 );
-
             }
         );
-
 }
 
 
@@ -986,43 +945,36 @@ function updateInventoryHealthBars(
 function showPerformanceFallback() {
 
     setText(
-        'performanceRevenue',
-        'Data unavailable'
+        "performanceRevenue",
+        "Data unavailable"
     );
-
 
     setText(
-        'inventoryTotal',
-        '—'
+        "inventoryTotal",
+        "—"
     );
-
 
     setText(
-        'inventoryHealthy',
-        '—'
+        "inventoryHealthy",
+        "—"
     );
-
 
     setText(
-        'inventoryLowStock',
-        '—'
+        "inventoryLowStock",
+        "—"
     );
-
 
     setText(
-        'inventoryStockout',
-        '—'
+        "inventoryStockout",
+        "—"
     );
-
 
     setText(
-        'inventorySlowMoving',
-        '—'
+        "inventorySlowMoving",
+        "—"
     );
-
 
     showChartFallback();
-
 }
 
 
@@ -1034,21 +986,16 @@ async function ask(question) {
 
     const input =
         document.getElementById(
-            'question'
+            "question"
         );
-
 
     if (!input) {
         return;
     }
 
-
-    input.value =
-        question;
-
+    input.value = question;
 
     await sendQuestion();
-
 }
 
 
@@ -1059,16 +1006,14 @@ async function ask(question) {
 function handleQuestionKey(event) {
 
     if (
-        event.key === 'Enter' &&
+        event.key === "Enter" &&
         !event.shiftKey
     ) {
 
         event.preventDefault();
 
         sendQuestion();
-
     }
-
 }
 
 
@@ -1080,33 +1025,27 @@ async function sendQuestion() {
 
     const input =
         document.getElementById(
-            'question'
+            "question"
         );
-
 
     const answer =
         document.getElementById(
-            'answer'
+            "answer"
         );
-
 
     if (!input || !answer) {
         return;
     }
 
-
     const question =
         input.value.trim();
-
 
     if (!question) {
 
         input.focus();
 
         return;
-
     }
-
 
     answer.innerHTML = `
 
@@ -1131,45 +1070,40 @@ async function sendQuestion() {
 
     `;
 
-
     try {
 
         const result =
             await getJSON(
-                '/api/copilot',
+                "/api/copilot",
                 {
 
-                    method: 'POST',
+                    method: "POST",
 
                     headers: {
-                        'Content-Type':
-                            'application/json'
+                        "Content-Type":
+                            "application/json"
                     },
 
                     body: JSON.stringify({
-                        question: question
+                        question
                     })
-
                 }
             );
-
 
         answer.innerHTML =
             renderMarkdown(
                 result.answer ||
-                'No answer was returned.'
+                "No answer was returned."
             );
-
 
     }
 
     catch (error) {
 
         console.error(
-            'Copilot error:',
+            "Copilot error:",
             error
         );
-
 
         answer.innerHTML = `
 
@@ -1196,9 +1130,7 @@ async function sendQuestion() {
             </div>
 
         `;
-
     }
-
 }
 
 
@@ -1209,150 +1141,99 @@ async function sendQuestion() {
 function renderMarkdown(text) {
 
     if (!text) {
-        return '';
+        return "";
     }
-
 
     let html =
         String(text);
 
-
-    /* Escape HTML */
-
     html = html
-        .replace(
-            /&/g,
-            '&amp;'
-        )
-        .replace(
-            /</g,
-            '&lt;'
-        )
-        .replace(
-            />/g,
-            '&gt;'
-        );
-
-
-    /* Remove markdown escaping */
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
     html = html.replace(
         /\\([*_#-])/g,
-        '$1'
+        "$1"
     );
-
-
-    /* Horizontal rules */
 
     html = html.replace(
         /^\s*---\s*$/gm,
-        '<hr>'
+        "<hr>"
     );
-
-
-    /* Headings */
 
     html = html.replace(
         /^###\s+(.+)$/gm,
-        '<h3>$1</h3>'
+        "<h3>$1</h3>"
     );
-
 
     html = html.replace(
         /^##\s+(.+)$/gm,
-        '<h2>$1</h2>'
+        "<h2>$1</h2>"
     );
-
 
     html = html.replace(
         /^#\s+(.+)$/gm,
-        '<h1>$1</h1>'
+        "<h1>$1</h1>"
     );
-
-
-    /* Bold */
 
     html = html.replace(
         /\*\*(.+?)\*\*/g,
-        '<strong>$1</strong>'
+        "<strong>$1</strong>"
     );
-
-
-    /* Italic */
 
     html = html.replace(
         /(?<!\*)\*([^*\n]+)\*(?!\*)/g,
-        '<em>$1</em>'
+        "<em>$1</em>"
     );
-
-
-    /* Bullet points */
 
     html = html.replace(
         /^\s*[-*]\s+(.+)$/gm,
         '<div class="copilot-bullet">• $1</div>'
     );
 
-
-    /* Numbered lists */
-
     html = html.replace(
         /^\s*\d+\.\s+(.+)$/gm,
         '<div class="copilot-numbered">$1</div>'
     );
 
-
-    /* Line breaks */
-
     html = html.replace(
         /\n{2,}/g,
-        '<br>'
+        "<br>"
     );
-
 
     html = html.replace(
         /\n/g,
-        '<br>'
+        "<br>"
     );
 
-
-    /* Clean breaks */
-
     html = html
-
         .replace(
             /(<br>)+(<h[1-3]>)/g,
-            '$2'
+            "$2"
         )
-
         .replace(
             /(<\/h[1-3]>)(<br>)+/g,
-            '$1'
+            "$1"
         )
-
         .replace(
             /(<br>)+(<hr>)/g,
-            '$2'
+            "$2"
         )
-
         .replace(
             /(<hr>)(<br>)+/g,
-            '$1'
+            "$1"
         )
-
         .replace(
             /(<br>)+(<div class="copilot-bullet">)/g,
-            '$2'
+            "$2"
         )
-
         .replace(
             /(<\/div>)(<br>)+/g,
-            '$1'
+            "$1"
         );
 
-
     return html;
-
 }
 
 
@@ -1364,20 +1245,17 @@ function showEvidence(evidence) {
 
     const modal =
         document.getElementById(
-            'modal'
+            "modal"
         );
-
 
     const content =
         document.getElementById(
-            'modalContent'
+            "modalContent"
         );
-
 
     if (!modal || !content) {
         return;
     }
-
 
     if (
         !evidence ||
@@ -1396,16 +1274,12 @@ function showEvidence(evidence) {
 
         `;
 
-
         modal.classList.remove(
-            'hidden'
+            "hidden"
         );
 
-
         return;
-
     }
-
 
     content.innerHTML = `
 
@@ -1430,18 +1304,16 @@ function showEvidence(evidence) {
 
                         `
                     )
-                    .join('')
+                    .join("")
             }
 
         </div>
 
     `;
 
-
     modal.classList.remove(
-        'hidden'
+        "hidden"
     );
-
 }
 
 
@@ -1454,20 +1326,13 @@ function formatEvidenceKey(key) {
     return escapeHTML(
 
         String(key)
-
-            .replace(
-                /_/g,
-                ' '
-            )
-
+            .replace(/_/g, " ")
             .replace(
                 /\b\w/g,
                 letter =>
                     letter.toUpperCase()
             )
-
     );
-
 }
 
 
@@ -1481,29 +1346,23 @@ function formatEvidenceValue(value) {
         value === null ||
         value === undefined
     ) {
-
-        return '—';
-
+        return "—";
     }
 
-
     if (
-        typeof value === 'number'
+        typeof value === "number"
     ) {
 
         return escapeHTML(
             value.toLocaleString(
-                'en-IN'
+                "en-IN"
             )
         );
-
     }
-
 
     return escapeHTML(
         String(value)
     );
-
 }
 
 
@@ -1515,18 +1374,15 @@ function closeModal() {
 
     const modal =
         document.getElementById(
-            'modal'
+            "modal"
         );
-
 
     if (modal) {
 
         modal.classList.add(
-            'hidden'
+            "hidden"
         );
-
     }
-
 }
 
 
@@ -1540,28 +1396,22 @@ async function loadSalesChart() {
 
         const data =
             await getJSON(
-                '/api/sales/trend'
+                "/api/sales/trend"
             );
 
-
-        renderSalesChart(
-            data
-        );
+        renderSalesChart(data);
 
     }
 
     catch (error) {
 
         console.error(
-            'Sales chart failed:',
+            "Sales chart failed:",
             error
         );
 
-
         showChartFallback();
-
     }
-
 }
 
 
@@ -1574,50 +1424,40 @@ function renderSalesChart(data) {
     const points =
         data.points || [];
 
-
     if (!points.length) {
 
         showChartFallback();
 
         return;
-
     }
-
 
     const line =
         document.getElementById(
-            'salesLine'
+            "salesLine"
         );
-
 
     const area =
         document.getElementById(
-            'salesArea'
+            "salesArea"
         );
-
 
     const pointsGroup =
         document.getElementById(
-            'salesPoints'
+            "salesPoints"
         );
-
 
     const dates =
         document.getElementById(
-            'chartDates'
+            "chartDates"
         );
-
 
     if (
         !line ||
         !area ||
         !pointsGroup
     ) {
-
         return;
-
     }
-
 
     const width = 900;
 
@@ -1627,12 +1467,10 @@ function renderSalesChart(data) {
 
     const paddingBottom = 30;
 
-
     const chartHeight =
         height -
         paddingTop -
         paddingBottom;
-
 
     const values =
         points.map(
@@ -1642,20 +1480,17 @@ function renderSalesChart(data) {
                 ) || 0
         );
 
-
     const maxValue =
         Math.max(
             ...values,
             1
         );
 
-
     const minValue =
         Math.min(
             ...values,
             0
         );
-
 
     const range =
         Math.max(
@@ -1664,16 +1499,13 @@ function renderSalesChart(data) {
             1
         );
 
-
     const coords =
         points.map(
             (item, index) => {
 
                 const x =
                     points.length === 1
-
                         ? width / 2
-
                         : (
                             index /
                             (
@@ -1681,7 +1513,6 @@ function renderSalesChart(data) {
                                 1
                             )
                         ) * width;
-
 
                 const normalized =
                     (
@@ -1691,13 +1522,11 @@ function renderSalesChart(data) {
                         minValue
                     ) / range;
 
-
                 const y =
                     paddingTop +
                     chartHeight -
                     normalized *
                     chartHeight;
-
 
                 return {
 
@@ -1716,16 +1545,9 @@ function renderSalesChart(data) {
 
                     date:
                         item.date
-
                 };
-
             }
         );
-
-
-    /* -----------------------------------------------------
-       Line
-       ----------------------------------------------------- */
 
     const linePath =
         coords
@@ -1733,12 +1555,11 @@ function renderSalesChart(data) {
                 (point, index) =>
                     `${
                         index === 0
-                            ? 'M'
-                            : 'L'
+                            ? "M"
+                            : "L"
                     } ${point.x} ${point.y}`
             )
-            .join(' ');
-
+            .join(" ");
 
     const areaPath =
         `${linePath}
@@ -1746,112 +1567,87 @@ function renderSalesChart(data) {
          L 0 ${height - paddingBottom}
          Z`;
 
-
     line.setAttribute(
-        'd',
+        "d",
         linePath
     );
 
-
     area.setAttribute(
-        'd',
+        "d",
         areaPath
     );
 
-
-    /* -----------------------------------------------------
-       Points
-       ----------------------------------------------------- */
-
-    pointsGroup.innerHTML = '';
-
+    pointsGroup.innerHTML = "";
 
     coords.forEach(
         point => {
 
             const circle =
                 document.createElementNS(
-                    'http://www.w3.org/2000/svg',
-                    'circle'
+                    "http://www.w3.org/2000/svg",
+                    "circle"
                 );
 
-
             circle.setAttribute(
-                'cx',
+                "cx",
                 point.x
             );
 
-
             circle.setAttribute(
-                'cy',
+                "cy",
                 point.y
             );
 
-
             circle.setAttribute(
-                'r',
-                '5'
+                "r",
+                "5"
             );
 
-
             circle.setAttribute(
-                'class',
-                'sales-point'
+                "class",
+                "sales-point"
             );
 
-
             circle.setAttribute(
-                'tabindex',
-                '0'
+                "tabindex",
+                "0"
             );
-
-
-            /* Hover */
 
             circle.addEventListener(
-                'mouseenter',
+                "mouseenter",
                 event => {
 
                     showChartTooltip(
                         event,
                         point
                     );
-
                 }
             );
 
-
             circle.addEventListener(
-                'mouseleave',
+                "mouseleave",
                 hideChartTooltip
             );
 
-
-            /* Click */
-
             circle.addEventListener(
-                'click',
+                "click",
                 () => {
 
                     showChartPointDetails(
                         point
                     );
-
                 }
             );
 
-
-            /* Keyboard */
-
             circle.addEventListener(
-                'keydown',
+                "keydown",
                 event => {
 
                     if (
                         event.key ===
-                            'Enter' ||
+                            "Enter" ||
                         event.key ===
-                            ' '
+                            " "
                     ) {
 
                         event.preventDefault();
@@ -1859,29 +1655,19 @@ function renderSalesChart(data) {
                         showChartPointDetails(
                             point
                         );
-
                     }
-
                 }
             );
-
 
             pointsGroup.appendChild(
                 circle
             );
-
         }
     );
 
-
-    /* -----------------------------------------------------
-       Dates
-       ----------------------------------------------------- */
-
     if (dates) {
 
-        dates.innerHTML = '';
-
+        dates.innerHTML = "";
 
         const dateIndexes = [
 
@@ -1899,46 +1685,31 @@ function renderSalesChart(data) {
 
         ];
 
-
         [
-            ...new Set(
-                dateIndexes
-            )
+            ...new Set(dateIndexes)
         ].forEach(
             index => {
 
-                if (
-                    !points[index]
-                ) {
+                if (!points[index]) {
                     return;
                 }
 
-
                 const span =
                     document.createElement(
-                        'span'
+                        "span"
                     );
-
 
                 span.textContent =
                     formatChartDate(
                         points[index].date
                     );
 
-
                 dates.appendChild(
                     span
                 );
-
             }
         );
-
     }
-
-
-    /* -----------------------------------------------------
-       Total revenue
-       ----------------------------------------------------- */
 
     const totalRevenue =
         data.total_revenue ??
@@ -1951,12 +1722,10 @@ function renderSalesChart(data) {
             0
         );
 
-
     const revenueElement =
         document.getElementById(
-            'chartRevenue'
+            "chartRevenue"
         );
-
 
     if (revenueElement) {
 
@@ -1964,19 +1733,12 @@ function renderSalesChart(data) {
             formatCurrency(
                 totalRevenue
             );
-
     }
-
-
-    /* -----------------------------------------------------
-       Trend
-       ----------------------------------------------------- */
 
     const trendElement =
         document.getElementById(
-            'chartTrend'
+            "chartTrend"
         );
-
 
     if (
         trendElement &&
@@ -1988,7 +1750,6 @@ function renderSalesChart(data) {
                 points[0].revenue
             ) || 0;
 
-
         const last =
             Number(
                 points[
@@ -1996,11 +1757,10 @@ function renderSalesChart(data) {
                 ].revenue
             ) || 0;
 
-
         if (first === 0) {
 
             trendElement.textContent =
-                'New sales data';
+                "New sales data";
 
         }
 
@@ -2014,22 +1774,17 @@ function renderSalesChart(data) {
                     ) / first
                 ) * 100;
 
-
             trendElement.textContent =
                 `${
                     change >= 0
-                        ? '↑'
-                        : '↓'
+                        ? "↑"
+                        : "↓"
                 } ${
-                    Math.abs(
-                        change
-                    ).toFixed(1)
+                    Math.abs(change)
+                        .toFixed(1)
                 }%`;
-
         }
-
     }
-
 }
 
 
@@ -2037,21 +1792,17 @@ function renderSalesChart(data) {
    CLICKABLE CHART POINT DETAILS
    ========================================================= */
 
-function showChartPointDetails(
-    point
-) {
+function showChartPointDetails(point) {
 
     const modal =
         document.getElementById(
-            'modal'
+            "modal"
         );
-
 
     const content =
         document.getElementById(
-            'modalContent'
+            "modalContent"
         );
-
 
     if (
         !modal ||
@@ -2059,7 +1810,6 @@ function showChartPointDetails(
     ) {
         return;
     }
-
 
     content.innerHTML = `
 
@@ -2072,13 +1822,10 @@ function showChartPointDetails(
                 </span>
 
                 <strong>
-                    ${formatChartDate(
-                        point.date
-                    )}
+                    ${formatChartDate(point.date)}
                 </strong>
 
             </div>
-
 
             <div class="chart-detail-grid">
 
@@ -2095,7 +1842,6 @@ function showChartPointDetails(
                     </div>
 
                 </div>
-
 
                 <div class="evidence-cell">
 
@@ -2117,11 +1863,9 @@ function showChartPointDetails(
 
     `;
 
-
     modal.classList.remove(
-        'hidden'
+        "hidden"
     );
-
 }
 
 
@@ -2136,14 +1880,12 @@ function showChartTooltip(
 
     const tooltip =
         document.getElementById(
-            'chartTooltip'
+            "chartTooltip"
         );
-
 
     if (!tooltip) {
         return;
     }
-
 
     tooltip.innerHTML = `
 
@@ -2167,20 +1909,16 @@ function showChartTooltip(
 
     `;
 
-
     const svg =
         event.target
             .ownerSVGElement;
-
 
     if (!svg) {
         return;
     }
 
-
     const rect =
         svg.getBoundingClientRect();
-
 
     const x =
         (
@@ -2188,26 +1926,21 @@ function showChartTooltip(
             900
         ) * rect.width;
 
-
     const y =
         (
             point.y /
             300
         ) * rect.height;
 
-
     tooltip.style.left =
         `${x}px`;
-
 
     tooltip.style.top =
         `${y}px`;
 
-
     tooltip.classList.remove(
-        'hidden'
+        "hidden"
     );
-
 }
 
 
@@ -2219,18 +1952,15 @@ function hideChartTooltip() {
 
     const tooltip =
         document.getElementById(
-            'chartTooltip'
+            "chartTooltip"
         );
-
 
     if (tooltip) {
 
         tooltip.classList.add(
-            'hidden'
+            "hidden"
         );
-
     }
-
 }
 
 
@@ -2242,54 +1972,44 @@ function showChartFallback() {
 
     const line =
         document.getElementById(
-            'salesLine'
+            "salesLine"
         );
-
 
     const area =
         document.getElementById(
-            'salesArea'
+            "salesArea"
         );
-
 
     if (line) {
 
         line.setAttribute(
-            'd',
-            ''
+            "d",
+            ""
         );
-
     }
-
 
     if (area) {
 
         area.setAttribute(
-            'd',
-            ''
+            "d",
+            ""
         );
-
     }
-
 
     const points =
         document.getElementById(
-            'salesPoints'
+            "salesPoints"
         );
-
 
     if (points) {
 
-        points.innerHTML = '';
-
+        points.innerHTML = "";
     }
-
 
     const dates =
         document.getElementById(
-            'chartDates'
+            "chartDates"
         );
-
 
     if (dates) {
 
@@ -2300,21 +2020,17 @@ function showChartFallback() {
             </span>
 
         `;
-
     }
 
-
     setText(
-        'chartRevenue',
-        '₹0'
+        "chartRevenue",
+        "₹0"
     );
 
-
     setText(
-        'chartTrend',
-        '—'
+        "chartTrend",
+        "—"
     );
-
 }
 
 
@@ -2325,16 +2041,15 @@ function showChartFallback() {
 function formatCurrency(value) {
 
     return new Intl.NumberFormat(
-        'en-IN',
+        "en-IN",
         {
-            style: 'currency',
-            currency: 'INR',
+            style: "currency",
+            currency: "INR",
             maximumFractionDigits: 0
         }
     ).format(
         Number(value || 0)
     );
-
 }
 
 
@@ -2347,7 +2062,6 @@ function formatChartDate(value) {
     const date =
         new Date(value);
 
-
     if (
         Number.isNaN(
             date.getTime()
@@ -2355,20 +2069,17 @@ function formatChartDate(value) {
     ) {
 
         return String(
-            value || ''
+            value || ""
         );
-
     }
 
-
     return date.toLocaleDateString(
-        'en-IN',
+        "en-IN",
         {
-            day: '2-digit',
-            month: 'short'
+            day: "2-digit",
+            month: "short"
         }
     );
-
 }
 
 
@@ -2379,34 +2090,28 @@ function formatChartDate(value) {
 function escapeHTML(value) {
 
     return String(
-        value ?? ''
+        value ?? ""
     )
-
         .replace(
             /&/g,
-            '&amp;'
+            "&amp;"
         )
-
         .replace(
             /</g,
-            '&lt;'
+            "&lt;"
         )
-
         .replace(
             />/g,
-            '&gt;'
+            "&gt;"
         )
-
         .replace(
             /"/g,
-            '&quot;'
+            "&quot;"
         )
-
         .replace(
             /'/g,
-            '&#039;'
+            "&#039;"
         );
-
 }
 
 
@@ -2416,30 +2121,23 @@ function escapeHTML(value) {
 
 function safeJSONStringify(value) {
 
-    return JSON.stringify(
-        value
-    )
-
+    return JSON.stringify(value)
         .replace(
             /'/g,
-            '&#39;'
+            "&#39;"
         )
-
         .replace(
             /</g,
-            '\\u003c'
+            "\\u003c"
         )
-
         .replace(
             />/g,
-            '\\u003e'
+            "\\u003e"
         )
-
         .replace(
             /&/g,
-            '\\u0026'
+            "\\u0026"
         );
-
 }
 
 
@@ -2448,18 +2146,15 @@ function safeJSONStringify(value) {
    ========================================================= */
 
 document.addEventListener(
-    'keydown',
+    "keydown",
     function(event) {
 
         if (
-            event.key ===
-            'Escape'
+            event.key === "Escape"
         ) {
 
             closeModal();
-
         }
-
     }
 );
 
@@ -2469,36 +2164,29 @@ document.addEventListener(
    ========================================================= */
 
 document.addEventListener(
-    'click',
+    "click",
     function(event) {
 
         const modal =
             document.getElementById(
-                'modal'
+                "modal"
             );
-
 
         if (
             !modal ||
             modal.classList.contains(
-                'hidden'
+                "hidden"
             )
         ) {
-
             return;
-
         }
 
-
         if (
-            event.target ===
-            modal
+            event.target === modal
         ) {
 
             closeModal();
-
         }
-
     }
 );
 
@@ -2510,6 +2198,14 @@ document.addEventListener(
 setInterval(
     async function() {
 
+        /*
+         * Do not refresh if the user has logged out.
+         */
+
+        if (!getAuthToken()) {
+            return;
+        }
+
         try {
 
             const [
@@ -2519,30 +2215,26 @@ setInterval(
             ] = await Promise.all([
 
                 getJSON(
-                    '/api/summary'
+                    "/api/summary"
                 ),
 
                 getJSON(
-                    '/api/attention'
+                    "/api/attention"
                 ),
 
                 getJSON(
-                    '/api/performance'
+                    "/api/performance"
                 )
 
             ]);
-
 
             renderSummary(
                 summary
             );
 
-
             renderAttention(
-                attention.items ||
-                []
+                attention.items || []
             );
-
 
             renderPerformance(
                 performance
@@ -2553,10 +2245,9 @@ setInterval(
         catch (error) {
 
             console.warn(
-                'Automatic dashboard refresh failed:',
+                "Automatic dashboard refresh failed:",
                 error
             );
-
         }
 
     },
@@ -2569,17 +2260,8 @@ setInterval(
    ========================================================= */
 
 document.addEventListener(
-    'DOMContentLoaded',
+    "DOMContentLoaded",
     function() {
-
-        /*
-         * load() handles:
-         * summary
-         * attention
-         * health
-         * performance
-         * sales chart
-         */
 
         load();
 

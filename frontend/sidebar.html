@@ -137,37 +137,83 @@
 
 
     <!-- SIDEBAR FOOTER -->
-    <div class="sidebar-footer">
+    <!-- SIDEBAR FOOTER -->
+<div class="sidebar-footer">
 
+    <!-- LOGGED-IN USER -->
+    <div class="sidebar-user-card" id="sidebarUserCard">
 
-        <!-- SYSTEM STATUS -->
-        <div class="sidebar-status-card">
+        <div class="sidebar-user-avatar" id="sidebarUserAvatar">
+            U
+        </div>
 
-            <span class="sidebar-status-dot"></span>
+        <div class="sidebar-user-info">
 
-            <div class="sidebar-status-content">
+            <div
+                class="sidebar-user-name"
+                id="sidebarUserName"
+            >
+                User
+            </div>
 
-                <div class="sidebar-status-title">
-                    System status
-                </div>
-
-                <div
-                    class="sidebar-status-text"
-                    id="sidebarStatus"
-                >
-                    Connected
-                </div>
-
+            <div
+                class="sidebar-user-role"
+                id="sidebarUserRole"
+            >
+                Retail Manager
             </div>
 
         </div>
 
+    </div>
 
-        <div class="sidebar-powered">
-            StoreSense Intelligence
+
+    <!-- LOGOUT -->
+    <button
+        type="button"
+        class="sidebar-logout-button"
+        id="sidebarLogoutButton"
+    >
+
+        <span class="sidebar-logout-icon">
+            ↪
+        </span>
+
+        <span class="sidebar-nav-text">
+            Logout
+        </span>
+
+    </button>
+
+
+    <!-- SYSTEM STATUS -->
+    <div class="sidebar-status-card">
+
+        <span class="sidebar-status-dot"></span>
+
+        <div class="sidebar-status-content">
+
+            <div class="sidebar-status-title">
+                System status
+            </div>
+
+            <div
+                class="sidebar-status-text"
+                id="sidebarStatus"
+            >
+                Connected
+            </div>
+
         </div>
 
     </div>
+
+
+    <div class="sidebar-powered">
+        StoreSense Intelligence
+    </div>
+
+</div>
 
 </aside>
 

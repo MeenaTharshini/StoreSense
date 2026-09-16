@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sign Up | StoreSense</title>
+
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+
+<body>
+
+<div class="auth-page">
+
+    <div class="auth-card">
+
+        <div class="brand">
+            <div class="brand-icon">S</div>
+            <div>
+                <h1>StoreSense</h1>
+                <p>Retail Intelligence Copilot</p>
+            </div>
+        </div>
+
+        <div class="auth-header">
+            <h2>Create your account</h2>
+            <p>Start managing your retail intelligence in one place.</p>
+        </div>
+
+        <form id="signupForm">
+
+            <div class="form-group">
+                <label for="name">Full name</label>
+
+                <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    placeholder="Enter your name"
+                    autocomplete="name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email address</label>
+
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    autocomplete="email"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+
+                <div class="password-wrapper">
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Create a password"
+                        autocomplete="new-password"
+                        required
+                    >
+
+                    <button
+                        type="button"
+                        class="toggle-password"
+                        data-target="password"
+                    >
+                        Show
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm password</label>
+
+                <div class="password-wrapper">
+                    <input
+                        type="password"
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        placeholder="Confirm your password"
+                        autocomplete="new-password"
+                        required
+                    >
+
+                    <button
+                        type="button"
+                        class="toggle-password"
+                        data-target="confirmPassword"
+                    >
+                        Show
+                    </button>
+                </div>
+            </div>
+
+            <div id="signupError" class="error-message"></div>
+
+            <button
+                type="submit"
+                class="auth-button"
+                id="signupButton"
+            >
+                Create Account
+            </button>
+
+        </form>
+
+        <div class="auth-footer">
+            <p>
+                Already have an account?
+                <a href="/static/login.html">Sign in</a>
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="/static/signin.js"></script>
+
+</body>
+</html>

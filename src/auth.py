@@ -17,11 +17,13 @@ Environment variables:
     STORESENSE_JWT_SECRET
     STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES
 
-Recommended:
-    Set STORESENSE_JWT_SECRET in your .env file.
+Recommended .env configuration:
 
-Example:
     STORESENSE_JWT_SECRET=your-long-random-secret
+    STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES=480
+
+The authentication database is stored locally and is completely
+independent from the retail data database.
 """
 
 from __future__ import annotations
@@ -37,72 +39,87 @@ from dotenv import load_dotenv
 from jose import JWTError, jwt
 
 
-# ---------------------------------------------------------------------------
-# Environment
-# ---------------------------------------------------------------------------
+# ============================================================
+# ENVIRONMENT
+# ============================================================
 
 load_dotenv()
 
 
-# ---------------------------------------------------------------------------
-# Paths / configuration
-# ---------------------------------------------------------------------------
+# ============================================================
+# PATHS / CONFIGURATION
+# ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 DATA_DIR = PROJECT_ROOT / "data"
 
 DEFAULT_AUTH_DB = DATA_DIR / "storesense_auth.db"
 
 AUTH_DB = Path(
-    os.getenv("STORESENSE_AUTH_DB", str(DEFAULT_AUTH_DB))
-)
+    os.getenv(
+        "STORESENSE_AUTH_DB",
+        str(DEFAULT_AUTH_DB),
+    )
+).expanduser()
 
-JWT_SECRET = os.getenv("STORESENSE_JWT_SECRET", "").strip()
+JWT_SECRET = os.getenv(
+    "STORESENSE_JWT_SECRET",
+    "",
+).strip()
 
 JWT_ALGORITHM = "HS256"
 
-ACCESS_TOKEN_EXPIRE_MINUTES = int(
-    os.getenv("STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES", "480")
-)
+try:
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(
+        os.getenv(
+            "STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES",
+            "480",
+        )
+    )
+except ValueError:
+    ACCESS_TOKEN_EXPIRE_MINUTES = 480
 
 
-# ---------------------------------------------------------------------------
-# Safety check
-# ---------------------------------------------------------------------------
+# ============================================================
+# JWT SECRET
+# ============================================================
 
 def _get_jwt_secret() -> str:
     """
-    Return the configured JWT secret.
+    Return the JWT signing secret.
 
-    A development fallback is allowed so the application can start without
-    configuration, but production/hackathon deployment should always set
-    STORESENSE_JWT_SECRET.
+    For development, a fallback is used so StoreSense can start
+    without a .env configuration.
+
+    For real deployment, STORESENSE_JWT_SECRET should always
+    be configured.
     """
 
     if JWT_SECRET:
         return JWT_SECRET
 
-    # Development-only fallback.
-    #
-    # IMPORTANT:
-    # Set STORESENSE_JWT_SECRET in .env for the real application.
     return "storesense-development-secret-change-me"
 
 
-# ---------------------------------------------------------------------------
-# Database helpers
-# ---------------------------------------------------------------------------
+# ============================================================
+# DATABASE
+# ============================================================
 
 def get_connection() -> sqlite3.Connection:
     """
-    Create a SQLite connection for the authentication database.
+    Create and return a SQLite connection for authentication.
     """
 
-    AUTH_DB.parent.mkdir(parents=True, exist_ok=True)
+    AUTH_DB.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     connection = sqlite3.connect(
-        AUTH_DB,
+        str(AUTH_DB),
         check_same_thread=False,
+        timeout=30,
     )
 
     connection.row_factory = sqlite3.Row
@@ -112,42 +129,64 @@ def get_connection() -> sqlite3.Connection:
 
 def init_auth_db() -> None:
     """
-    Create the authentication tables if they do not exist.
+    Create the authentication database and users table
+    if they do not already exist.
     """
 
     with get_connection() as connection:
+
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+
                 email TEXT NOT NULL UNIQUE,
+
                 full_name TEXT NOT NULL,
+
                 password_hash TEXT NOT NULL,
+
                 role TEXT NOT NULL DEFAULT 'manager',
+
                 is_active INTEGER NOT NULL DEFAULT 1,
+
                 created_at TEXT NOT NULL,
+
                 updated_at TEXT NOT NULL
             )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_users_email
+            ON users(email)
             """
         )
 
         connection.commit()
 
 
-# ---------------------------------------------------------------------------
-# Password utilities
-# ---------------------------------------------------------------------------
+# ============================================================
+# PASSWORD HASHING
+# ============================================================
 
 def hash_password(password: str) -> str:
     """
-    Hash a plain-text password using bcrypt.
+    Hash a password using bcrypt.
+
+    The plain-text password is never stored.
     """
 
     if not isinstance(password, str):
-        raise TypeError("Password must be a string.")
+        raise TypeError(
+            "Password must be a string."
+        )
 
     if not password:
-        raise ValueError("Password cannot be empty.")
+        raise ValueError(
+            "Password cannot be empty."
+        )
 
     password_bytes = password.encode("utf-8")
 
@@ -167,26 +206,39 @@ def verify_password(
     Verify a plain-text password against a bcrypt hash.
     """
 
-    if not plain_password or not password_hash:
+    if not plain_password:
+        return False
+
+    if not password_hash:
         return False
 
     try:
+
         return bcrypt.checkpw(
             plain_password.encode("utf-8"),
             password_hash.encode("utf-8"),
         )
-    except (ValueError, TypeError):
+
+    except (
+        ValueError,
+        TypeError,
+        bcrypt.InvalidHashError,
+    ):
         return False
 
 
-# ---------------------------------------------------------------------------
-# User utilities
-# ---------------------------------------------------------------------------
+# ============================================================
+# EMAIL / USER HELPERS
+# ============================================================
 
 def normalize_email(email: str) -> str:
     """
-    Normalize an email address.
+    Normalize an email address for consistent storage
+    and lookup.
     """
+
+    if not isinstance(email, str):
+        return ""
 
     return email.strip().lower()
 
@@ -198,34 +250,83 @@ def create_user(
     role: str = "manager",
 ) -> dict[str, Any]:
     """
-    Create a new user.
+    Create a new StoreSense user.
 
     Raises:
-        ValueError: if the email already exists or input is invalid.
+        ValueError:
+            If the input is invalid or the email already exists.
     """
 
     email = normalize_email(email)
 
+    full_name = (
+        full_name.strip()
+        if isinstance(full_name, str)
+        else ""
+    )
+
+    role = (
+        role.strip()
+        if isinstance(role, str)
+        else "manager"
+    )
+
     if not email:
-        raise ValueError("Email is required.")
+        raise ValueError(
+            "Email is required."
+        )
 
     if "@" not in email:
-        raise ValueError("Please enter a valid email address.")
+        raise ValueError(
+            "Please enter a valid email address."
+        )
+
+    if len(email) > 320:
+        raise ValueError(
+            "Email address is too long."
+        )
+
+    if not isinstance(password, str):
+        raise ValueError(
+            "Password is required."
+        )
 
     if len(password) < 6:
         raise ValueError(
             "Password must contain at least 6 characters."
         )
 
-    if not full_name.strip():
-        raise ValueError("Full name is required.")
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError(
+            "Password is too long for bcrypt. "
+            "Please use 72 bytes or fewer."
+        )
 
-    now = datetime.now(timezone.utc).isoformat()
+    if not full_name:
+        raise ValueError(
+            "Full name is required."
+        )
 
-    password_hash = hash_password(password)
+    if len(full_name) > 150:
+        raise ValueError(
+            "Full name is too long."
+        )
+
+    if not role:
+        role = "manager"
+
+    password_hash = hash_password(
+        password
+    )
+
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
 
     try:
+
         with get_connection() as connection:
+
             cursor = connection.execute(
                 """
                 INSERT INTO users (
@@ -241,9 +342,9 @@ def create_user(
                 """,
                 (
                     email,
-                    full_name.strip(),
+                    full_name,
                     password_hash,
-                    role.strip() or "manager",
+                    role,
                     1,
                     now,
                     now,
@@ -254,29 +355,41 @@ def create_user(
 
             user_id = cursor.lastrowid
 
-    except sqlite3.IntegrityError:
+    except sqlite3.IntegrityError as exc:
+
+        if "email" in str(exc).lower():
+            raise ValueError(
+                "A user with this email already exists."
+            ) from exc
+
         raise ValueError(
-            "A user with this email already exists."
-        )
+            "Unable to create the user."
+        ) from exc
 
     return {
         "id": user_id,
         "email": email,
-        "full_name": full_name.strip(),
-        "role": role.strip() or "manager",
+        "full_name": full_name,
+        "role": role,
         "is_active": True,
         "created_at": now,
     }
 
 
-def get_user_by_email(email: str) -> dict[str, Any] | None:
+def get_user_by_email(
+    email: str,
+) -> dict[str, Any] | None:
     """
-    Find a user by email.
+    Find a user by email address.
     """
 
     email = normalize_email(email)
 
+    if not email:
+        return None
+
     with get_connection() as connection:
+
         row = connection.execute(
             """
             SELECT
@@ -301,12 +414,23 @@ def get_user_by_email(email: str) -> dict[str, Any] | None:
     return dict(row)
 
 
-def get_user_by_id(user_id: int) -> dict[str, Any] | None:
+def get_user_by_id(
+    user_id: int,
+) -> dict[str, Any] | None:
     """
-    Find a user by numeric ID.
+    Find a user by numeric database ID.
     """
 
+    try:
+        user_id = int(user_id)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
     with get_connection() as connection:
+
         row = connection.execute(
             """
             SELECT
@@ -331,9 +455,13 @@ def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     return dict(row)
 
 
-def public_user(user: dict[str, Any]) -> dict[str, Any]:
+def public_user(
+    user: dict[str, Any],
+) -> dict[str, Any]:
     """
-    Remove sensitive fields before returning user information to the frontend.
+    Return only safe user information.
+
+    The password hash is deliberately excluded.
     """
 
     return {
@@ -341,14 +469,16 @@ def public_user(user: dict[str, Any]) -> dict[str, Any]:
         "email": user["email"],
         "full_name": user["full_name"],
         "role": user["role"],
-        "is_active": bool(user["is_active"]),
+        "is_active": bool(
+            user["is_active"]
+        ),
         "created_at": user["created_at"],
     }
 
 
-# ---------------------------------------------------------------------------
-# Authentication
-# ---------------------------------------------------------------------------
+# ============================================================
+# USER AUTHENTICATION
+# ============================================================
 
 def authenticate_user(
     email: str,
@@ -359,15 +489,19 @@ def authenticate_user(
 
     Returns:
         User dictionary if authentication succeeds.
-        None if authentication fails.
+        None otherwise.
     """
 
-    user = get_user_by_email(email)
+    user = get_user_by_email(
+        email
+    )
 
     if user is None:
         return None
 
-    if not bool(user["is_active"]):
+    if not bool(
+        user["is_active"]
+    ):
         return None
 
     if not verify_password(
@@ -379,43 +513,59 @@ def authenticate_user(
     return user
 
 
-# ---------------------------------------------------------------------------
-# JWT
-# ---------------------------------------------------------------------------
+# ============================================================
+# JWT TOKEN CREATION
+# ============================================================
 
 def create_access_token(
     user: dict[str, Any],
     expires_minutes: int | None = None,
 ) -> str:
     """
-    Create a signed JWT access token.
+    Create a signed JWT access token for a user.
     """
 
     if expires_minutes is None:
-        expires_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
+        expires_minutes = (
+            ACCESS_TOKEN_EXPIRE_MINUTES
+        )
 
-    now = datetime.now(timezone.utc)
+    if expires_minutes <= 0:
+        expires_minutes = 480
 
-    expires_at = now + timedelta(
-        minutes=expires_minutes
+    now = datetime.now(
+        timezone.utc
+    )
+
+    expires_at = (
+        now
+        + timedelta(
+            minutes=expires_minutes
+        )
     )
 
     payload = {
         "sub": str(user["id"]),
         "email": user["email"],
         "role": user["role"],
-        "iat": int(now.timestamp()),
-        "exp": int(expires_at.timestamp()),
+        "iat": int(
+            now.timestamp()
+        ),
+        "exp": int(
+            expires_at.timestamp()
+        ),
     }
 
-    token = jwt.encode(
+    return jwt.encode(
         payload,
         _get_jwt_secret(),
         algorithm=JWT_ALGORITHM,
     )
 
-    return token
 
+# ============================================================
+# JWT TOKEN VALIDATION
+# ============================================================
 
 def decode_access_token(
     token: str,
@@ -432,20 +582,29 @@ def decode_access_token(
         return None
 
     try:
+
         payload = jwt.decode(
             token,
             _get_jwt_secret(),
-            algorithms=[JWT_ALGORITHM],
+            algorithms=[
+                JWT_ALGORITHM
+            ],
         )
 
-        user_id = payload.get("sub")
+        user_id = payload.get(
+            "sub"
+        )
 
         if not user_id:
             return None
 
         return payload
 
-    except JWTError:
+    except (
+        JWTError,
+        TypeError,
+        ValueError,
+    ):
         return None
 
 
@@ -453,39 +612,70 @@ def get_user_from_token(
     token: str,
 ) -> dict[str, Any] | None:
     """
-    Resolve a JWT token to the corresponding active user.
+    Resolve a JWT access token to an active StoreSense user.
     """
 
-    payload = decode_access_token(token)
+    payload = decode_access_token(
+        token
+    )
 
     if payload is None:
         return None
 
     try:
-        user_id = int(payload["sub"])
-    except (KeyError, TypeError, ValueError):
+
+        user_id = int(
+            payload["sub"]
+        )
+
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return None
 
-    user = get_user_by_id(user_id)
+    user = get_user_by_id(
+        user_id
+    )
 
     if user is None:
         return None
 
-    if not bool(user["is_active"]):
+    if not bool(
+        user["is_active"]
+    ):
         return None
 
     return user
 
 
-# ---------------------------------------------------------------------------
-# Default StoreSense account
-# ---------------------------------------------------------------------------
+# ============================================================
+# DEFAULT MANAGER ACCOUNT
+# ============================================================
+
+DEFAULT_MANAGER_EMAIL = (
+    "manager@storesense.local"
+)
+
+DEFAULT_MANAGER_PASSWORD = (
+    "StoreSense@123"
+)
+
+DEFAULT_MANAGER_NAME = (
+    "Store Manager"
+)
+
+DEFAULT_MANAGER_ROLE = (
+    "manager"
+)
+
 
 def ensure_default_manager() -> dict[str, Any]:
     """
-    Ensure that StoreSense has at least one manager account.
+    Ensure that the default StoreSense manager exists.
 
-    Default development credentials:
+    Development credentials:
 
         Email:
             manager@storesense.local
@@ -493,44 +683,44 @@ def ensure_default_manager() -> dict[str, Any]:
         Password:
             StoreSense@123
 
-    IMPORTANT:
-    Change this password for any real deployment.
+    This function NEVER overwrites an existing account.
     """
 
     init_auth_db()
 
-    default_email = "manager@storesense.local"
-
-    existing = get_user_by_email(default_email)
+    existing = get_user_by_email(
+        DEFAULT_MANAGER_EMAIL
+    )
 
     if existing is not None:
         return existing
 
     return create_user(
-        email=default_email,
-        password="StoreSense@123",
-        full_name="Store Manager",
-        role="manager",
+        email=DEFAULT_MANAGER_EMAIL,
+        password=DEFAULT_MANAGER_PASSWORD,
+        full_name=DEFAULT_MANAGER_NAME,
+        role=DEFAULT_MANAGER_ROLE,
     )
 
 
-# ---------------------------------------------------------------------------
-# Startup initialization
-# ---------------------------------------------------------------------------
+# ============================================================
+# AUTH INITIALIZATION
+# ============================================================
 
 def initialize_auth() -> None:
     """
-    Initialize the authentication system.
+    Initialize the StoreSense authentication system.
 
-    Call this once when StoreSense starts.
+    Safe to call multiple times.
     """
 
     init_auth_db()
+
     ensure_default_manager()
 
 
-# ---------------------------------------------------------------------------
-# Module initialization
-# ---------------------------------------------------------------------------
+# ============================================================
+# INITIALIZE AUTH DATABASE
+# ============================================================
 
 initialize_auth()
