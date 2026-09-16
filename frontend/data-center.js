@@ -2,6 +2,16 @@
 // STORESENSE DATA CENTER
 // ============================================================
 
+"use strict";
+
+
+// ============================================================
+// AUTHENTICATION KEYS
+// ============================================================
+
+const TOKEN_KEY = "storesense_access_token";
+const USER_KEY = "storesense_user";
+
 
 // ============================================================
 // API HELPER
@@ -9,35 +19,202 @@
 
 async function api(url, options = {}) {
 
-    const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {})
-        },
-        ...options
-    });
+    const token =
+        localStorage.getItem(TOKEN_KEY);
 
-    let data;
 
-    try {
-        data = await response.json();
-    } catch {
+    // --------------------------------------------------------
+    // AUTHENTICATION CHECK
+    // --------------------------------------------------------
+
+    if (!token) {
+
+        console.warn(
+            "StoreSense: No authentication token found."
+        );
+
+        redirectToLogin();
+
         throw new Error(
-            `Invalid server response (${response.status})`
+            "Authentication required."
         );
     }
+
+
+    // --------------------------------------------------------
+    // HEADERS
+    // --------------------------------------------------------
+
+    const headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+
+        "Authorization":
+            `Bearer ${token}`,
+
+        ...(options.headers || {})
+    };
+
+
+    // --------------------------------------------------------
+    // REQUEST
+    // --------------------------------------------------------
+
+    let response;
+
+    try {
+
+        response =
+            await fetch(
+                url,
+                {
+                    ...options,
+                    headers
+                }
+            );
+
+    } catch (error) {
+
+        console.error(
+            "StoreSense API connection failed:",
+            error
+        );
+
+        throw new Error(
+            "Unable to connect to StoreSense server."
+        );
+    }
+
+
+    // --------------------------------------------------------
+    // READ RESPONSE
+    // --------------------------------------------------------
+
+    let data = null;
+
+    const contentType =
+        response.headers.get(
+            "content-type"
+        ) || "";
+
+
+    if (
+        contentType.includes(
+            "application/json"
+        )
+    ) {
+
+        try {
+
+            data =
+                await response.json();
+
+        } catch {
+
+            data = null;
+
+        }
+
+    } else {
+
+        try {
+
+            const text =
+                await response.text();
+
+            data = text
+                ? { message: text }
+                : null;
+
+        } catch {
+
+            data = null;
+
+        }
+
+    }
+
+
+    // --------------------------------------------------------
+    // UNAUTHORIZED
+    // --------------------------------------------------------
+
+    if (response.status === 401) {
+
+        console.warn(
+            "StoreSense: Authentication expired or invalid."
+        );
+
+
+        // Remove invalid session
+
+        localStorage.removeItem(
+            TOKEN_KEY
+        );
+
+        localStorage.removeItem(
+            USER_KEY
+        );
+
+
+        redirectToLogin();
+
+
+        throw new Error(
+            "Authentication required."
+        );
+    }
+
+
+    // --------------------------------------------------------
+    // OTHER SERVER ERRORS
+    // --------------------------------------------------------
 
     if (!response.ok) {
 
-        throw new Error(
-            data.error ||
-            data.detail ||
-            data.message ||
-            "Request failed"
-        );
+        const message =
+            data?.error ||
+            data?.detail ||
+            data?.message ||
+            `Request failed (${response.status})`;
+
+
+        throw new Error(message);
     }
 
+
     return data;
+}
+
+
+// ============================================================
+// REDIRECT TO LOGIN
+// ============================================================
+
+function redirectToLogin() {
+
+    const currentPath =
+        window.location.pathname +
+        window.location.search;
+
+
+    const loginURL =
+        `/login?next=${encodeURIComponent(
+            currentPath
+        )}`;
+
+
+    // Avoid repeatedly redirecting
+
+    if (
+        window.location.pathname !==
+        "/login"
+    ) {
+
+        window.location.replace(
+            loginURL
+        );
+    }
 }
 
 
@@ -47,75 +224,94 @@ async function api(url, options = {}) {
 
 async function loadStores() {
 
-    const result = await api("/api/stores");
-
-    /*
-     * Supports both:
-     *
-     * [
-     *   {...}
-     * ]
-     *
-     * and:
-     *
-     * {
-     *   stores: [...]
-     * }
-     */
-
-    const stores = Array.isArray(result)
-        ? result
-        : (result.stores || []);
+    const result =
+        await api(
+            "/api/stores"
+        );
 
 
-    // Inventory store dropdown
+    const stores =
+        Array.isArray(result)
+            ? result
+            : (result?.stores || []);
+
+
+    // --------------------------------------------------------
+    // INVENTORY STORE DROPDOWN
+    // --------------------------------------------------------
 
     const inventorySelect =
-        document.getElementById("inventoryStore");
+        document.getElementById(
+            "inventoryStore"
+        );
+
 
     if (inventorySelect) {
 
         inventorySelect.innerHTML =
             '<option value="">Select store</option>';
 
+
         stores.forEach(store => {
 
             const option =
-                document.createElement("option");
+                document.createElement(
+                    "option"
+                );
+
 
             option.value =
                 store.store_id;
 
+
             option.textContent =
                 `${store.store_name || store.store_id} (${store.store_id})`;
 
-            inventorySelect.appendChild(option);
+
+            inventorySelect.appendChild(
+                option
+            );
+
         });
     }
 
 
-    // Sales store dropdown
+    // --------------------------------------------------------
+    // SALES STORE DROPDOWN
+    // --------------------------------------------------------
 
     const saleSelect =
-        document.getElementById("saleStore");
+        document.getElementById(
+            "saleStore"
+        );
+
 
     if (saleSelect) {
 
         saleSelect.innerHTML =
             '<option value="">Select store</option>';
 
+
         stores.forEach(store => {
 
             const option =
-                document.createElement("option");
+                document.createElement(
+                    "option"
+                );
+
 
             option.value =
                 store.store_id;
 
+
             option.textContent =
                 `${store.store_name || store.store_id} (${store.store_id})`;
 
-            saleSelect.appendChild(option);
+
+            saleSelect.appendChild(
+                option
+            );
+
         });
     }
 }
@@ -127,75 +323,94 @@ async function loadStores() {
 
 async function loadProducts() {
 
-    const result = await api("/api/products");
-
-    /*
-     * Supports both:
-     *
-     * [
-     *   {...}
-     * ]
-     *
-     * and:
-     *
-     * {
-     *   products: [...]
-     * }
-     */
-
-    const products = Array.isArray(result)
-        ? result
-        : (result.products || []);
+    const result =
+        await api(
+            "/api/products"
+        );
 
 
-    // Inventory product dropdown
+    const products =
+        Array.isArray(result)
+            ? result
+            : (result?.products || []);
+
+
+    // --------------------------------------------------------
+    // INVENTORY PRODUCT DROPDOWN
+    // --------------------------------------------------------
 
     const inventorySelect =
-        document.getElementById("inventoryProduct");
+        document.getElementById(
+            "inventoryProduct"
+        );
+
 
     if (inventorySelect) {
 
         inventorySelect.innerHTML =
             '<option value="">Select product</option>';
 
+
         products.forEach(product => {
 
             const option =
-                document.createElement("option");
+                document.createElement(
+                    "option"
+                );
+
 
             option.value =
                 product.product_id;
 
+
             option.textContent =
                 `${product.product_name || product.product_id} (${product.product_id})`;
 
-            inventorySelect.appendChild(option);
+
+            inventorySelect.appendChild(
+                option
+            );
+
         });
     }
 
 
-    // Sales product dropdown
+    // --------------------------------------------------------
+    // SALES PRODUCT DROPDOWN
+    // --------------------------------------------------------
 
     const saleSelect =
-        document.getElementById("saleProduct");
+        document.getElementById(
+            "saleProduct"
+        );
+
 
     if (saleSelect) {
 
         saleSelect.innerHTML =
             '<option value="">Select product</option>';
 
+
         products.forEach(product => {
 
             const option =
-                document.createElement("option");
+                document.createElement(
+                    "option"
+                );
+
 
             option.value =
                 product.product_id;
 
+
             option.textContent =
                 `${product.product_name || product.product_id} (${product.product_id})`;
 
-            saleSelect.appendChild(option);
+
+            saleSelect.appendChild(
+                option
+            );
+
         });
     }
 }
@@ -208,7 +423,10 @@ async function loadProducts() {
 function initializeStoreForm() {
 
     const form =
-        document.getElementById("storeForm");
+        document.getElementById(
+            "storeForm"
+        );
+
 
     if (!form) return;
 
@@ -234,36 +452,48 @@ function initializeStoreForm() {
                         {
                             method: "POST",
 
-                            body: JSON.stringify({
+                            body:
+                                JSON.stringify({
 
-                                store_id:
-                                    document
-                                        .getElementById("storeId")
-                                        .value
-                                        .trim(),
+                                    store_id:
+                                        document
+                                            .getElementById(
+                                                "storeId"
+                                            )
+                                            .value
+                                            .trim(),
 
-                                store_name:
-                                    document
-                                        .getElementById("storeName")
-                                        .value
-                                        .trim(),
+                                    store_name:
+                                        document
+                                            .getElementById(
+                                                "storeName"
+                                            )
+                                            .value
+                                            .trim(),
 
-                                location:
-                                    document
-                                        .getElementById("storeLocation")
-                                        .value
-                                        .trim()
-                            })
+                                    location:
+                                        document
+                                            .getElementById(
+                                                "storeLocation"
+                                            )
+                                            .value
+                                            .trim()
+
+                                })
                         }
                     );
 
 
-                message.textContent =
-                    result.message ||
-                    "Store saved successfully.";
+                if (message) {
 
-                message.className =
-                    "form-message success";
+                    message.textContent =
+                        result?.message ||
+                        "Store saved successfully.";
+
+                    message.className =
+                        "form-message success";
+
+                }
 
 
                 form.reset();
@@ -274,17 +504,24 @@ function initializeStoreForm() {
 
             } catch (error) {
 
-                message.textContent =
-                    error.message;
+                if (message) {
 
-                message.className =
-                    "form-message error";
+                    message.textContent =
+                        error.message;
+
+                    message.className =
+                        "form-message error";
+
+                }
+
 
                 console.error(
                     "Add store failed:",
                     error
                 );
+
             }
+
         }
     );
 }
@@ -297,7 +534,10 @@ function initializeStoreForm() {
 function initializeProductForm() {
 
     const form =
-        document.getElementById("productForm");
+        document.getElementById(
+            "productForm"
+        );
+
 
     if (!form) return;
 
@@ -319,7 +559,9 @@ function initializeProductForm() {
 
                 const priceValue =
                     document
-                        .getElementById("productPrice")
+                        .getElementById(
+                            "productPrice"
+                        )
                         .value;
 
 
@@ -327,19 +569,25 @@ function initializeProductForm() {
 
                     product_id:
                         document
-                            .getElementById("productId")
+                            .getElementById(
+                                "productId"
+                            )
                             .value
                             .trim(),
 
                     product_name:
                         document
-                            .getElementById("productName")
+                            .getElementById(
+                                "productName"
+                            )
                             .value
                             .trim(),
 
                     category:
                         document
-                            .getElementById("productCategory")
+                            .getElementById(
+                                "productCategory"
+                            )
                             .value
                             .trim(),
 
@@ -347,6 +595,7 @@ function initializeProductForm() {
                         priceValue === ""
                             ? 0
                             : Number(priceValue)
+
                 };
 
 
@@ -357,17 +606,23 @@ function initializeProductForm() {
                             method: "POST",
 
                             body:
-                                JSON.stringify(payload)
+                                JSON.stringify(
+                                    payload
+                                )
                         }
                     );
 
 
-                message.textContent =
-                    result.message ||
-                    "Product saved successfully.";
+                if (message) {
 
-                message.className =
-                    "form-message success";
+                    message.textContent =
+                        result?.message ||
+                        "Product saved successfully.";
+
+                    message.className =
+                        "form-message success";
+
+                }
 
 
                 form.reset();
@@ -378,17 +633,24 @@ function initializeProductForm() {
 
             } catch (error) {
 
-                message.textContent =
-                    error.message;
+                if (message) {
 
-                message.className =
-                    "form-message error";
+                    message.textContent =
+                        error.message;
+
+                    message.className =
+                        "form-message error";
+
+                }
+
 
                 console.error(
                     "Add product failed:",
                     error
                 );
+
             }
+
         }
     );
 }
@@ -401,7 +663,10 @@ function initializeProductForm() {
 function initializeInventoryForm() {
 
     const form =
-        document.getElementById("inventoryForm");
+        document.getElementById(
+            "inventoryForm"
+        );
+
 
     if (!form) return;
 
@@ -453,7 +718,40 @@ function initializeInventoryForm() {
                             )
                             .value
                             .trim()
+
                 };
+
+
+                if (!payload.store_id) {
+
+                    throw new Error(
+                        "Please select a store."
+                    );
+
+                }
+
+
+                if (!payload.product_id) {
+
+                    throw new Error(
+                        "Please select a product."
+                    );
+
+                }
+
+
+                if (
+                    !Number.isInteger(
+                        payload.stock
+                    ) ||
+                    payload.stock < 0
+                ) {
+
+                    throw new Error(
+                        "Stock must be a non-negative whole number."
+                    );
+
+                }
 
 
                 const result =
@@ -463,42 +761,50 @@ function initializeInventoryForm() {
                             method: "PUT",
 
                             body:
-                                JSON.stringify(payload)
+                                JSON.stringify(
+                                    payload
+                                )
                         }
                     );
 
 
-                message.textContent =
-                    result.message ||
-                    "Inventory saved successfully.";
+                if (message) {
 
-                message.className =
-                    "form-message success";
+                    message.textContent =
+                        result?.message ||
+                        "Inventory saved successfully.";
+
+                    message.className =
+                        "form-message success";
+
+                }
 
 
                 form.reset();
 
 
-                /*
-                 * Reload database counts because
-                 * inventory history may have changed.
-                 */
-
                 await loadDatabaseCounts();
 
             } catch (error) {
 
-                message.textContent =
-                    error.message;
+                if (message) {
 
-                message.className =
-                    "form-message error";
+                    message.textContent =
+                        error.message;
+
+                    message.className =
+                        "form-message error";
+
+                }
+
 
                 console.error(
                     "Inventory update failed:",
                     error
                 );
+
             }
+
         }
     );
 }
@@ -511,7 +817,10 @@ function initializeInventoryForm() {
 function initializeSaleForm() {
 
     const form =
-        document.getElementById("saleForm");
+        document.getElementById(
+            "saleForm"
+        );
+
 
     if (!form) return;
 
@@ -533,56 +842,78 @@ function initializeSaleForm() {
 
                 const storeId =
                     document
-                        .getElementById("saleStore")
+                        .getElementById(
+                            "saleStore"
+                        )
                         .value;
+
 
                 const productId =
                     document
-                        .getElementById("saleProduct")
+                        .getElementById(
+                            "saleProduct"
+                        )
                         .value;
+
 
                 const units =
                     Number(
                         document
-                            .getElementById("saleUnits")
+                            .getElementById(
+                                "saleUnits"
+                            )
                             .value
                     );
 
+
                 const revenueInput =
                     document
-                        .getElementById("saleRevenue")
+                        .getElementById(
+                            "saleRevenue"
+                        )
                         .value
                         .trim();
 
 
-                /*
-                 * Basic validation
-                 */
+                // ------------------------------------------------
+                // VALIDATION
+                // ------------------------------------------------
 
                 if (!storeId) {
+
                     throw new Error(
                         "Please select a store."
                     );
+
                 }
 
 
                 if (!productId) {
+
                     throw new Error(
                         "Please select a product."
                     );
+
                 }
 
 
-                if (!Number.isInteger(units) || units <= 0) {
+                if (
+                    !Number.isInteger(
+                        units
+                    ) ||
+                    units <= 0
+                ) {
+
                     throw new Error(
                         "Units sold must be a positive whole number."
                     );
+
                 }
 
 
-                /*
-                 * Build sale payload.
-                 */
+                // ------------------------------------------------
+                // PAYLOAD
+                // ------------------------------------------------
 
                 const payload = {
 
@@ -594,42 +925,47 @@ function initializeSaleForm() {
 
                     units_sold:
                         units
+
                 };
 
 
-                /*
-                 * Revenue is optional.
-                 *
-                 * If the user enters it, send it.
-                 * Otherwise let the backend calculate it
-                 * if supported.
-                 */
+                // ------------------------------------------------
+                // OPTIONAL REVENUE
+                // ------------------------------------------------
 
-                if (revenueInput !== "") {
+                if (
+                    revenueInput !== ""
+                ) {
 
                     const revenue =
-                        Number(revenueInput);
+                        Number(
+                            revenueInput
+                        );
 
 
                     if (
-                        Number.isNaN(revenue) ||
+                        Number.isNaN(
+                            revenue
+                        ) ||
                         revenue < 0
                     ) {
 
                         throw new Error(
                             "Revenue must be a valid non-negative number."
                         );
+
                     }
 
 
                     payload.revenue =
                         revenue;
+
                 }
 
 
-                /*
-                 * Send sale to backend.
-                 */
+                // ------------------------------------------------
+                // SEND SALE
+                // ------------------------------------------------
 
                 const result =
                     await api(
@@ -638,60 +974,54 @@ function initializeSaleForm() {
                             method: "POST",
 
                             body:
-                                JSON.stringify(payload)
+                                JSON.stringify(
+                                    payload
+                                )
                         }
                     );
 
 
-                /*
-                 * Success message.
-                 */
+                if (message) {
 
-                message.textContent =
-                    result.message ||
-                    "Sale recorded successfully.";
+                    message.textContent =
+                        result?.message ||
+                        "Sale recorded successfully.";
 
-                message.className =
-                    "form-message success";
+                    message.className =
+                        "form-message success";
 
+                }
 
-                /*
-                 * Clear form.
-                 */
 
                 form.reset();
 
 
-                /*
-                 * Refresh database counts.
-                 */
-
                 await loadDatabaseCounts();
 
-
-                /*
-                 * Reload inventory/product data.
-                 *
-                 * This keeps the dropdown data fresh
-                 * after a sale changes inventory.
-                 */
-
                 await loadStores();
+
                 await loadProducts();
 
             } catch (error) {
 
-                message.textContent =
-                    error.message;
+                if (message) {
 
-                message.className =
-                    "form-message error";
+                    message.textContent =
+                        error.message;
+
+                    message.className =
+                        "form-message error";
+
+                }
+
 
                 console.error(
                     "Record sale failed:",
                     error
                 );
+
             }
+
         }
     );
 }
@@ -721,7 +1051,7 @@ async function loadDatabaseCounts() {
 
 
         const counts =
-            result.counts || {};
+            result?.counts || {};
 
 
         container.innerHTML = `
@@ -733,7 +1063,7 @@ async function loadDatabaseCounts() {
                 </span>
 
                 <strong class="database-count-value">
-                    ${counts.stores || 0}
+                    ${Number(counts.stores || 0)}
                 </strong>
 
             </div>
@@ -746,7 +1076,7 @@ async function loadDatabaseCounts() {
                 </span>
 
                 <strong class="database-count-value">
-                    ${counts.products || 0}
+                    ${Number(counts.products || 0)}
                 </strong>
 
             </div>
@@ -759,7 +1089,7 @@ async function loadDatabaseCounts() {
                 </span>
 
                 <strong class="database-count-value">
-                    ${counts.inventory || 0}
+                    ${Number(counts.inventory || 0)}
                 </strong>
 
             </div>
@@ -772,7 +1102,7 @@ async function loadDatabaseCounts() {
                 </span>
 
                 <strong class="database-count-value">
-                    ${counts.sales || 0}
+                    ${Number(counts.sales || 0)}
                 </strong>
 
             </div>
@@ -785,7 +1115,7 @@ async function loadDatabaseCounts() {
                 </span>
 
                 <strong class="database-count-value">
-                    ${counts.inventory_history || 0}
+                    ${Number(counts.inventory_history || 0)}
                 </strong>
 
             </div>
@@ -793,10 +1123,9 @@ async function loadDatabaseCounts() {
         `;
 
 
-        /*
-         * Update the small record status
-         * shown near the top of the page.
-         */
+        // ------------------------------------------------------
+        // RECORD STATUS
+        // ------------------------------------------------------
 
         const recordStatus =
             document.getElementById(
@@ -807,19 +1136,26 @@ async function loadDatabaseCounts() {
         if (recordStatus) {
 
             recordStatus.textContent =
-                `${counts.stores || 0} stores · ` +
-                `${counts.products || 0} products · ` +
-                `${counts.inventory || 0} inventory records · ` +
-                `${counts.sales || 0} sales`;
+                `${Number(counts.stores || 0)} stores · ` +
+                `${Number(counts.products || 0)} products · ` +
+                `${Number(counts.inventory || 0)} inventory records · ` +
+                `${Number(counts.sales || 0)} sales`;
+
         }
 
 
     } catch (error) {
 
         container.innerHTML = `
+
             <div class="loading-state">
-                ${escapeHTML(error.message)}
+
+                ${escapeHTML(
+                    error.message
+                )}
+
             </div>
+
         `;
 
 
@@ -833,6 +1169,7 @@ async function loadDatabaseCounts() {
 
             recordStatus.textContent =
                 "Unable to load records.";
+
         }
 
 
@@ -840,6 +1177,7 @@ async function loadDatabaseCounts() {
             "Database count loading failed:",
             error
         );
+
     }
 }
 
@@ -851,11 +1189,31 @@ async function loadDatabaseCounts() {
 function escapeHTML(value) {
 
     return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
 }
 
 
@@ -867,24 +1225,31 @@ async function initialize() {
 
     try {
 
-        /*
-         * Initialize forms first.
-         */
+        // ------------------------------------------------------
+        // FORMS
+        // ------------------------------------------------------
 
         initializeStoreForm();
+
         initializeProductForm();
+
         initializeInventoryForm();
+
         initializeSaleForm();
 
 
-        /*
-         * Load database information.
-         */
+        // ------------------------------------------------------
+        // LOAD DATA
+        // ------------------------------------------------------
 
         await Promise.all([
+
             loadStores(),
+
             loadProducts(),
+
             loadDatabaseCounts()
+
         ]);
 
 
@@ -899,6 +1264,7 @@ async function initialize() {
             "Data Center initialization failed:",
             error
         );
+
     }
 }
 
@@ -908,7 +1274,8 @@ async function initialize() {
 // ============================================================
 
 if (
-    document.readyState === "loading"
+    document.readyState ===
+    "loading"
 ) {
 
     document.addEventListener(
@@ -919,4 +1286,5 @@ if (
 } else {
 
     initialize();
+
 }
