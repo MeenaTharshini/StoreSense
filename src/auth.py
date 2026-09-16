@@ -1,72 +1,46 @@
 """
-StoreSense - Retail Sales & Inventory Copilot
-==============================================
+StoreSense Authentication
+=========================
 
-FastAPI application for the StoreSense retail intelligence platform.
+Authentication utilities for the StoreSense FastAPI application.
 
 Features:
-- JWT authentication
-- User-scoped retail data
-- Retail sales analytics
-- Inventory intelligence
-- Attention alerts
-- Evidence-backed recommendations
-- Gemini-powered retail copilot
-- Static frontend serving
-
-Run locally:
-
-    python app.py
-
-Server:
-
-    http://localhost:8000
+- SQLite user storage
+- Secure bcrypt password hashing
+- JWT access tokens
+- Token validation
+- Current-user extraction
+- Automatic default manager creation
+- Serverless-safe lazy database initialization
 
 Environment variables:
 
-    GEMINI_API_KEY
-    DATABASE_URL
+    STORESENSE_AUTH_DB
     STORESENSE_JWT_SECRET
     STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES
+
+Example:
+
+    STORESENSE_JWT_SECRET=your-long-random-secret
+    STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES=480
+
+Important:
+- The authentication database is separate from retail data.
+- The SQLite database is initialized lazily.
+- No database is created merely by importing this module.
 """
 
 from __future__ import annotations
 
 import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import psycopg
+import bcrypt
 from dotenv import load_dotenv
-from fastapi import (
-    Depends,
-    FastAPI,
-    HTTPException,
-    Request,
-    status,
-)
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import (
-    FileResponse,
-    JSONResponse,
-)
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-from src.auth import (
-    authenticate_user,
-    create_access_token,
-    create_user,
-    get_user_from_token,
-    initialize_auth,
-    public_user,
-)
-
-from src.analytics import RetailAnalytics
-from src.copilot import StoreSenseCopilot
-from src.database import RetailData
+from jose import JWTError, jwt
 
 
 # ============================================================
@@ -80,1481 +54,836 @@ load_dotenv()
 # PROJECT PATHS
 # ============================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-FRONTEND_DIR = PROJECT_ROOT / "frontend"
 DATA_DIR = PROJECT_ROOT / "data"
 
 
 # ============================================================
-# ENVIRONMENT CONFIGURATION
+# AUTH DATABASE LOCATION
 # ============================================================
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "",
-).strip()
+def _get_auth_database_path() -> Path:
+    """
+    Determine the SQLite authentication database path.
 
-GEMINI_API_KEY = os.getenv(
-    "GEMINI_API_KEY",
-    "",
-).strip()
+    Priority:
+
+    1. STORESENSE_AUTH_DB environment variable
+    2. /tmp on serverless environments
+    3. local data/storesense_auth.db
+
+    Serverless platforms generally do not allow reliable writes
+    to the application directory. /tmp is writable, although
+    its contents are not guaranteed to persist between instances.
+    """
+
+    configured_path = os.getenv(
+        "STORESENSE_AUTH_DB",
+        "",
+    ).strip()
+
+    if configured_path:
+        return Path(
+            configured_path
+        ).expanduser()
+
+    # Vercel / common serverless environment.
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return Path(
+            "/tmp/storesense_auth.db"
+        )
+
+    return DATA_DIR / "storesense_auth.db"
+
+
+AUTH_DB = _get_auth_database_path()
 
 
 # ============================================================
-# FASTAPI APPLICATION
+# JWT CONFIGURATION
 # ============================================================
 
-app = FastAPI(
-    title="StoreSense",
-    description=(
-        "Retail Sales & Inventory Copilot"
-    ),
-    version="1.0.0",
-)
+JWT_ALGORITHM = "HS256"
+
+
+def _get_jwt_secret() -> str:
+    """
+    Get the JWT secret at runtime.
+
+    A development fallback is provided so the application can
+    still run locally without a .env file.
+
+    For deployment, STORESENSE_JWT_SECRET should always be set.
+    """
+
+    secret = os.getenv(
+        "STORESENSE_JWT_SECRET",
+        "",
+    ).strip()
+
+    if secret:
+        return secret
+
+    return "storesense-development-secret-change-me"
+
+
+def _get_access_token_expire_minutes() -> int:
+    """
+    Read JWT expiration configuration safely.
+    """
+
+    raw_value = os.getenv(
+        "STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES",
+        "480",
+    ).strip()
+
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        value = 480
+
+    if value <= 0:
+        value = 480
+
+    return value
 
 
 # ============================================================
-# CORS
+# DATABASE CONNECTION
 # ============================================================
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+def get_connection() -> sqlite3.Connection:
+    """
+    Create a SQLite authentication database connection.
+
+    The directory is created only when a database connection is
+    actually requested.
+
+    This is intentionally NOT executed during module import.
+    """
+
+    database_path = AUTH_DB
+
+    try:
+        database_path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+    except OSError as exc:
+        raise RuntimeError(
+            "Unable to create the StoreSense authentication "
+            f"database directory: {database_path.parent}"
+        ) from exc
+
+    try:
+        connection = sqlite3.connect(
+            str(database_path),
+            check_same_thread=False,
+            timeout=30,
+        )
+    except sqlite3.Error as exc:
+        raise RuntimeError(
+            "Unable to open the StoreSense authentication database."
+        ) from exc
+
+    connection.row_factory = sqlite3.Row
+
+    return connection
 
 
 # ============================================================
-# AUTHENTICATION
+# DATABASE INITIALIZATION
 # ============================================================
 
-security = HTTPBearer(
-    auto_error=False
-)
+def init_auth_db() -> None:
+    """
+    Create the authentication database and users table.
+
+    Safe to call repeatedly.
+    """
+
+    with get_connection() as connection:
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                email TEXT NOT NULL UNIQUE,
+
+                full_name TEXT NOT NULL,
+
+                password_hash TEXT NOT NULL,
+
+                role TEXT NOT NULL DEFAULT 'manager',
+
+                is_active INTEGER NOT NULL DEFAULT 1,
+
+                created_at TEXT NOT NULL,
+
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_users_email
+            ON users(email)
+            """
+        )
+
+        connection.commit()
 
 
-def get_user_id(
-    user: dict[str, Any],
+# ============================================================
+# PASSWORD HASHING
+# ============================================================
+
+def hash_password(
+    password: str,
 ) -> str:
     """
-    Return the authenticated user's ID.
+    Hash a password using bcrypt.
 
-    RetailData uses this value to isolate each
-    user's stores, products, inventory and sales.
+    The plaintext password is never stored.
     """
 
-    value = (
-        user.get("user_id")
-        or user.get("id")
+    if not isinstance(password, str):
+        raise TypeError(
+            "Password must be a string."
+        )
+
+    if not password:
+        raise ValueError(
+            "Password cannot be empty."
+        )
+
+    password_bytes = password.encode(
+        "utf-8"
     )
 
-    if value is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authenticated user ID is missing.",
+    if len(password_bytes) > 72:
+        raise ValueError(
+            "Password is too long for bcrypt. "
+            "Please use 72 bytes or fewer."
         )
 
-    return str(value)
+    hashed = bcrypt.hashpw(
+        password_bytes,
+        bcrypt.gensalt(),
+    )
+
+    return hashed.decode(
+        "utf-8"
+    )
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(
-        security
-    ),
+def verify_password(
+    plain_password: str,
+    password_hash: str,
+) -> bool:
+    """
+    Verify a plaintext password against a bcrypt hash.
+    """
+
+    if not isinstance(
+        plain_password,
+        str,
+    ):
+        return False
+
+    if not isinstance(
+        password_hash,
+        str,
+    ):
+        return False
+
+    if not plain_password:
+        return False
+
+    if not password_hash:
+        return False
+
+    try:
+
+        return bcrypt.checkpw(
+            plain_password.encode(
+                "utf-8"
+            ),
+            password_hash.encode(
+                "utf-8"
+            ),
+        )
+
+    except (
+        ValueError,
+        TypeError,
+        bcrypt.InvalidHashError,
+    ):
+        return False
+
+
+# ============================================================
+# EMAIL HELPERS
+# ============================================================
+
+def normalize_email(
+    email: str,
+) -> str:
+    """
+    Normalize an email address.
+    """
+
+    if not isinstance(
+        email,
+        str,
+    ):
+        return ""
+
+    return email.strip().lower()
+
+
+# ============================================================
+# CREATE USER
+# ============================================================
+
+def create_user(
+    email: str,
+    password: str,
+    full_name: str = "Store Manager",
+    role: str = "manager",
 ) -> dict[str, Any]:
     """
-    Resolve the current authenticated user from
-    the Bearer JWT token.
+    Create a new StoreSense user.
+
+    Raises:
+        ValueError:
+            If input is invalid or email already exists.
     """
 
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required.",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            },
+    # Ensure DB exists before accessing it.
+    init_auth_db()
+
+    email = normalize_email(
+        email
+    )
+
+    full_name = (
+        full_name.strip()
+        if isinstance(
+            full_name,
+            str,
+        )
+        else ""
+    )
+
+    role = (
+        role.strip()
+        if isinstance(
+            role,
+            str,
+        )
+        else "manager"
+    )
+
+    if not email:
+        raise ValueError(
+            "Email is required."
         )
 
-    token = credentials.credentials
+    if "@" not in email:
+        raise ValueError(
+            "Please enter a valid email address."
+        )
 
-    user = get_user_from_token(token)
+    if len(email) > 320:
+        raise ValueError(
+            "Email address is too long."
+        )
+
+    if not isinstance(
+        password,
+        str,
+    ):
+        raise ValueError(
+            "Password is required."
+        )
+
+    if len(password) < 6:
+        raise ValueError(
+            "Password must contain at least 6 characters."
+        )
+
+    if len(
+        password.encode("utf-8")
+    ) > 72:
+        raise ValueError(
+            "Password is too long for bcrypt. "
+            "Please use 72 bytes or fewer."
+        )
+
+    if not full_name:
+        raise ValueError(
+            "Full name is required."
+        )
+
+    if len(full_name) > 150:
+        raise ValueError(
+            "Full name is too long."
+        )
+
+    if not role:
+        role = "manager"
+
+    password_hash = hash_password(
+        password
+    )
+
+    now = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    try:
+
+        with get_connection() as connection:
+
+            cursor = connection.execute(
+                """
+                INSERT INTO users (
+                    email,
+                    full_name,
+                    password_hash,
+                    role,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    email,
+                    full_name,
+                    password_hash,
+                    role,
+                    1,
+                    now,
+                    now,
+                ),
+            )
+
+            connection.commit()
+
+            user_id = cursor.lastrowid
+
+    except sqlite3.IntegrityError as exc:
+
+        if "email" in str(
+            exc
+        ).lower():
+
+            raise ValueError(
+                "A user with this email already exists."
+            ) from exc
+
+        raise ValueError(
+            "Unable to create the user."
+        ) from exc
+
+    return {
+        "id": user_id,
+        "email": email,
+        "full_name": full_name,
+        "role": role,
+        "is_active": True,
+        "created_at": now,
+    }
+
+
+# ============================================================
+# GET USER BY EMAIL
+# ============================================================
+
+def get_user_by_email(
+    email: str,
+) -> dict[str, Any] | None:
+    """
+    Find a user by email address.
+    """
+
+    init_auth_db()
+
+    email = normalize_email(
+        email
+    )
+
+    if not email:
+        return None
+
+    with get_connection() as connection:
+
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                email,
+                full_name,
+                password_hash,
+                role,
+                is_active,
+                created_at,
+                updated_at
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+            """,
+            (email,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+
+# ============================================================
+# GET USER BY ID
+# ============================================================
+
+def get_user_by_id(
+    user_id: int | str,
+) -> dict[str, Any] | None:
+    """
+    Find a user by numeric database ID.
+    """
+
+    init_auth_db()
+
+    try:
+        user_id = int(
+            user_id
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+    with get_connection() as connection:
+
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                email,
+                full_name,
+                password_hash,
+                role,
+                is_active,
+                created_at,
+                updated_at
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+
+# ============================================================
+# PUBLIC USER
+# ============================================================
+
+def public_user(
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Return safe user information.
+
+    Password hashes are never returned.
+    """
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"],
+        "is_active": bool(
+            user["is_active"]
+        ),
+        "created_at": user["created_at"],
+    }
+
+
+# ============================================================
+# AUTHENTICATE USER
+# ============================================================
+
+def authenticate_user(
+    email: str,
+    password: str,
+) -> dict[str, Any] | None:
+    """
+    Authenticate a user using email and password.
+
+    Returns:
+        User dictionary if successful.
+        None otherwise.
+    """
+
+    user = get_user_by_email(
+        email
+    )
 
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired authentication token.",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            },
-        )
+        return None
+
+    if not bool(
+        user["is_active"]
+    ):
+        return None
+
+    if not verify_password(
+        password,
+        user["password_hash"],
+    ):
+        return None
 
     return user
 
 
 # ============================================================
-# USER-SCOPED DATA DEPENDENCIES
+# CREATE ACCESS TOKEN
 # ============================================================
 
-def get_user_data(
-    user: dict[str, Any] = Depends(
-        get_current_user
-    ),
-) -> RetailData:
+def create_access_token(
+    user: dict[str, Any],
+    expires_minutes: int | None = None,
+) -> str:
     """
-    Create a RetailData instance scoped to the
-    authenticated user.
-
-    IMPORTANT:
-    Never create one global RetailData instance for
-    all users.
+    Create a signed JWT access token.
     """
 
-    return RetailData(
-        owner_user_id=get_user_id(user),
-        data_dir=DATA_DIR,
-    )
-
-
-def get_user_analytics(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-) -> RetailAnalytics:
-    """
-    Create analytics using only the current
-    user's RetailData.
-    """
-
-    return RetailAnalytics(data)
-
-
-# ============================================================
-# REQUEST MODELS
-# ============================================================
-
-class LoginRequest(BaseModel):
-    email: str = Field(
-        ...,
-        min_length=3,
-        max_length=320,
-    )
-
-    password: str = Field(
-        ...,
-        min_length=1,
-        max_length=200,
-    )
-
-
-class RegisterRequest(BaseModel):
-    email: str = Field(
-        ...,
-        min_length=3,
-        max_length=320,
-    )
-
-    password: str = Field(
-        ...,
-        min_length=6,
-        max_length=72,
-    )
-
-    full_name: str = Field(
-        ...,
-        min_length=1,
-        max_length=150,
-    )
-
-
-class CopilotRequest(BaseModel):
-    question: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-    )
-
-
-class SaleRequest(BaseModel):
-    store_id: str
-    product_id: str
-    units_sold: int = Field(
-        ...,
-        gt=0,
-    )
-
-
-class InventoryUpdateRequest(BaseModel):
-    store_id: str
-    product_id: str
-    stock: int = Field(
-        ...,
-        ge=0,
-    )
-
-
-# ============================================================
-# STARTUP
-# ============================================================
-
-@app.on_event("startup")
-def startup_event() -> None:
-    """
-    Initialize StoreSense authentication.
-
-    The function is safe to call repeatedly.
-    """
-
-    initialize_auth()
-
-
-# ============================================================
-# ROOT / FRONTEND
-# ============================================================
-
-@app.get(
-    "/",
-    include_in_schema=False,
-)
-async def root():
-    """
-    Serve the StoreSense landing/login page.
-    """
-
-    index_file = FRONTEND_DIR / "index.html"
-
-    if index_file.exists():
-        return FileResponse(index_file)
-
-    return JSONResponse(
-        {
-            "ok": True,
-            "service": "StoreSense",
-            "message": "StoreSense API is running.",
-        }
-    )
-
-
-@app.get(
-    "/login",
-    include_in_schema=False,
-)
-async def login_page():
-    file = FRONTEND_DIR / "login.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Login page not found.",
+    if expires_minutes is None:
+        expires_minutes = (
+            _get_access_token_expire_minutes()
         )
 
-    return FileResponse(file)
+    if expires_minutes <= 0:
+        expires_minutes = 480
 
+    now = datetime.now(
+        timezone.utc
+    )
 
-@app.get(
-    "/signin",
-    include_in_schema=False,
-)
-async def signin_page():
-    file = FRONTEND_DIR / "signin.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Signin page not found.",
+    expires_at = (
+        now
+        + timedelta(
+            minutes=expires_minutes
         )
+    )
 
-    return FileResponse(file)
+    payload = {
+        "sub": str(
+            user["id"]
+        ),
+        "email": user["email"],
+        "role": user["role"],
+        "iat": int(
+            now.timestamp()
+        ),
+        "exp": int(
+            expires_at.timestamp()
+        ),
+    }
 
-
-@app.get(
-    "/dashboard",
-    include_in_schema=False,
-)
-async def dashboard_page():
-    file = FRONTEND_DIR / "index.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Dashboard page not found.",
-        )
-
-    return FileResponse(file)
-
-
-@app.get(
-    "/mobile",
-    include_in_schema=False,
-)
-async def mobile_page():
-    file = FRONTEND_DIR / "mobile.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Mobile page not found.",
-        )
-
-    return FileResponse(file)
-
-
-@app.get(
-    "/data-center",
-    include_in_schema=False,
-)
-async def data_center_page():
-    file = FRONTEND_DIR / "data-center.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Data Center page not found.",
-        )
-
-    return FileResponse(file)
-
-
-@app.get(
-    "/analytics",
-    include_in_schema=False,
-)
-async def analytics_page():
-    """
-    Serve analytics page.
-
-    If a dedicated analytics.html exists, use it.
-    Otherwise fall back to dashboard.
-    """
-
-    file = FRONTEND_DIR / "analytics.html"
-
-    if file.exists():
-        return FileResponse(file)
-
-    fallback = FRONTEND_DIR / "index.html"
-
-    if fallback.exists():
-        return FileResponse(fallback)
-
-    raise HTTPException(
-        status_code=404,
-        detail="Analytics page not found.",
+    return jwt.encode(
+        payload,
+        _get_jwt_secret(),
+        algorithm=JWT_ALGORITHM,
     )
 
 
-@app.get(
-    "/attention",
-    include_in_schema=False,
-)
-async def attention_page():
-    """
-    Serve attention page if available.
-    """
-
-    file = FRONTEND_DIR / "attention.html"
-
-    if file.exists():
-        return FileResponse(file)
-
-    fallback = FRONTEND_DIR / "index.html"
-
-    if fallback.exists():
-        return FileResponse(fallback)
-
-    raise HTTPException(
-        status_code=404,
-        detail="Attention page not found.",
-    )
-
-
-@app.get(
-    "/inventory",
-    include_in_schema=False,
-)
-async def inventory_page():
-    file = FRONTEND_DIR / "inventory.html"
-
-    if not file.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Inventory page not found.",
-        )
-
-    return FileResponse(file)
-
-
 # ============================================================
-# AUTH API
+# DECODE ACCESS TOKEN
 # ============================================================
 
-@app.post(
-    "/api/auth/register",
-)
-async def register(
-    payload: RegisterRequest,
-):
+def decode_access_token(
+    token: str,
+) -> dict[str, Any] | None:
     """
-    Create a new StoreSense user.
+    Decode and validate a JWT access token.
     """
+
+    if not isinstance(
+        token,
+        str,
+    ):
+        return None
+
+    token = token.strip()
+
+    if not token:
+        return None
 
     try:
 
-        user = create_user(
-            email=payload.email,
-            password=payload.password,
-            full_name=payload.full_name,
-            role="manager",
+        payload = jwt.decode(
+            token,
+            _get_jwt_secret(),
+            algorithms=[
+                JWT_ALGORITHM
+            ],
         )
 
-        token = create_access_token(
-            user
+        user_id = payload.get(
+            "sub"
         )
 
-        return {
-            "ok": True,
-            "message": "Account created successfully.",
-            "access_token": token,
-            "token_type": "bearer",
-            "user": public_user(user),
-        }
+        if not user_id:
+            return None
 
-    except ValueError as exc:
+        return payload
 
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-
-    except Exception as exc:
-
-        print(
-            "Registration error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to create the account.",
-        ) from exc
+    except (
+        JWTError,
+        TypeError,
+        ValueError,
+    ):
+        return None
 
 
-@app.post(
-    "/api/auth/login",
-)
-async def login(
-    payload: LoginRequest,
-):
+# ============================================================
+# GET USER FROM TOKEN
+# ============================================================
+
+def get_user_from_token(
+    token: str,
+) -> dict[str, Any] | None:
     """
-    Authenticate a StoreSense user and return a JWT.
+    Resolve a JWT token to an active StoreSense user.
     """
 
-    user = authenticate_user(
-        payload.email,
-        payload.password,
+    payload = decode_access_token(
+        token
+    )
+
+    if payload is None:
+        return None
+
+    try:
+
+        user_id = int(
+            payload["sub"]
+        )
+
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+    user = get_user_by_id(
+        user_id
     )
 
     if user is None:
+        return None
 
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
-            headers={
-                "WWW-Authenticate": "Bearer"
-            },
-        )
+    if not bool(
+        user["is_active"]
+    ):
+        return None
 
-    token = create_access_token(
-        user
+    return user
+
+
+# ============================================================
+# DEFAULT MANAGER ACCOUNT
+# ============================================================
+
+DEFAULT_MANAGER_EMAIL = (
+    "manager@storesense.local"
+)
+
+DEFAULT_MANAGER_PASSWORD = (
+    "StoreSense@123"
+)
+
+DEFAULT_MANAGER_NAME = (
+    "Store Manager"
+)
+
+DEFAULT_MANAGER_ROLE = (
+    "manager"
+)
+
+
+def ensure_default_manager() -> dict[str, Any]:
+    """
+    Ensure that the default manager account exists.
+
+    Existing accounts are never overwritten.
+    """
+
+    init_auth_db()
+
+    existing = get_user_by_email(
+        DEFAULT_MANAGER_EMAIL
     )
 
-    return {
-        "ok": True,
-        "message": "Login successful.",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": public_user(user),
-    }
-
-
-@app.get(
-    "/api/auth/me",
-)
-async def auth_me(
-    user: dict[str, Any] = Depends(
-        get_current_user
-    ),
-):
-    """
-    Return the currently authenticated user's
-    safe public information.
-    """
-
-    return {
-        "ok": True,
-        "user": public_user(user),
-    }
-
-
-@app.post(
-    "/api/auth/logout",
-)
-async def logout(
-    user: dict[str, Any] = Depends(
-        get_current_user
-    ),
-):
-    """
-    JWT logout endpoint.
-
-    JWTs are stateless, so the frontend removes the token.
-    """
-
-    return {
-        "ok": True,
-        "message": "Logged out successfully.",
-    }
-
-
-# ============================================================
-# HEALTH
-# ============================================================
-
-@app.get(
-    "/api/health",
-)
-async def health():
-    """
-    Public system health endpoint.
-
-    This endpoint deliberately does NOT require JWT
-    authentication so the deployment can be diagnosed
-    independently of user sessions.
-    """
-
-    database_connected = False
-    database_error = None
-
-    if DATABASE_URL:
-
-        try:
-
-            with psycopg.connect(
-                DATABASE_URL,
-                connect_timeout=5,
-            ) as connection:
-
-                with connection.cursor() as cursor:
-
-                    cursor.execute(
-                        "SELECT 1"
-                    )
-
-                    cursor.fetchone()
-
-            database_connected = True
-
-        except Exception as exc:
-
-            database_error = str(exc)
-
-    return {
-        "ok": True,
-        "service": "StoreSense",
-        "status": "healthy",
-        "database": "Neon PostgreSQL",
-        "database_configured": bool(
-            DATABASE_URL
-        ),
-        "database_connected": database_connected,
-        "database_error": database_error,
-        "gemini_configured": bool(
-            GEMINI_API_KEY
-        ),
-    }
-
-
-# ============================================================
-# DASHBOARD SUMMARY
-# ============================================================
-
-@app.get(
-    "/api/summary",
-)
-async def summary(
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Return user-scoped dashboard KPIs.
-    """
+    if existing is not None:
+        return existing
 
     try:
 
-        result = analytics.summary()
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "ok": True,
-            **result,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Summary error:",
-            repr(exc),
+        return create_user(
+            email=DEFAULT_MANAGER_EMAIL,
+            password=DEFAULT_MANAGER_PASSWORD,
+            full_name=DEFAULT_MANAGER_NAME,
+            role=DEFAULT_MANAGER_ROLE,
         )
 
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to calculate dashboard summary.",
-        ) from exc
+    except ValueError as exc:
 
+        # Another request may have created the account
+        # simultaneously.
+        if "already exists" in str(
+            exc
+        ).lower():
 
-# ============================================================
-# ATTENTION
-# ============================================================
-
-@app.get(
-    "/api/attention",
-)
-async def attention(
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Return evidence-backed attention items for
-    the authenticated user's retail data.
-    """
-
-    try:
-
-        result = analytics.attention()
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "ok": True,
-            "items": result,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Attention error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to calculate attention items.",
-        ) from exc
-
-
-# ============================================================
-# EVIDENCE
-# ============================================================
-
-@app.get(
-    "/api/evidence",
-)
-async def evidence(
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Return evidence information used by
-    StoreSense analytics.
-    """
-
-    try:
-
-        result = analytics.evidence()
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "ok": True,
-            "evidence": result,
-        }
-
-    except AttributeError:
-
-        return {
-            "ok": True,
-            "evidence": [],
-        }
-
-    except Exception as exc:
-
-        print(
-            "Evidence error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve evidence.",
-        ) from exc
-
-
-# ============================================================
-# PRODUCTS
-# ============================================================
-
-@app.get(
-    "/api/products",
-)
-async def products(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Return products belonging to the current user.
-    """
-
-    try:
-
-        frame = data.products
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
+            existing = get_user_by_email(
+                DEFAULT_MANAGER_EMAIL
             )
 
-        else:
-            records = frame
+            if existing is not None:
+                return existing
 
-        return {
-            "ok": True,
-            "products": records,
-            "count": len(records),
-        }
-
-    except Exception as exc:
-
-        print(
-            "Products error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve products.",
-        ) from exc
-
-
-# ============================================================
-# STORES
-# ============================================================
-
-@app.get(
-    "/api/stores",
-)
-async def stores(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Return stores belonging to the current user.
-    """
-
-    try:
-
-        frame = data.stores
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
-            )
-
-        else:
-            records = frame
-
-        return {
-            "ok": True,
-            "stores": records,
-            "count": len(records),
-        }
-
-    except Exception as exc:
-
-        print(
-            "Stores error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve stores.",
-        ) from exc
-
-
-# ============================================================
-# INVENTORY
-# ============================================================
-
-@app.get(
-    "/api/inventory",
-)
-async def inventory(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Return user-scoped inventory.
-    """
-
-    try:
-
-        frame = data.inventory
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
-            )
-
-        else:
-            records = frame
-
-        return {
-            "ok": True,
-            "inventory": records,
-            "count": len(records),
-        }
-
-    except Exception as exc:
-
-        print(
-            "Inventory error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve inventory.",
-        ) from exc
-
-
-# ============================================================
-# SALES
-# ============================================================
-
-@app.get(
-    "/api/sales",
-)
-async def sales(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Return user-scoped sales records.
-    """
-
-    try:
-
-        frame = data.sales
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
-            )
-
-        else:
-            records = frame
-
-        return {
-            "ok": True,
-            "sales": records,
-            "count": len(records),
-        }
-
-    except Exception as exc:
-
-        print(
-            "Sales error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve sales.",
-        ) from exc
-
-
-# ============================================================
-# DATABASE INFORMATION
-# ============================================================
-
-@app.get(
-    "/api/database",
-)
-async def database_info(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Return user-scoped database record counts.
-    """
-
-    try:
-
-        counts = data.count_records()
-
-        return {
-            "ok": True,
-            "database": "Neon PostgreSQL",
-            "counts": counts,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Database info error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve database information.",
-        ) from exc
-
-
-# ============================================================
-# SALES TREND
-# ============================================================
-
-@app.get(
-    "/api/sales/trend",
-)
-async def sales_trend(
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Return user-scoped sales trend data.
-    """
-
-    try:
-
-        result = analytics.sales_trend()
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "ok": True,
-            "points": result,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Sales trend error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to calculate sales trend.",
-        ) from exc
-
-
-# ============================================================
-# PERFORMANCE
-# ============================================================
-
-@app.get(
-    "/api/performance",
-)
-async def performance(
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Return user-scoped business performance data.
-    """
-
-    try:
-
-        result = analytics.performance()
-
-        if isinstance(result, dict):
-            return result
-
-        return {
-            "ok": True,
-            "performance": result,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Performance error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to calculate business performance.",
-        ) from exc
-
-
-# ============================================================
-# COPILOT
-# ============================================================
-
-@app.post(
-    "/api/copilot",
-)
-async def copilot(
-    payload: CopilotRequest,
-    analytics: RetailAnalytics = Depends(
-        get_user_analytics
-    ),
-):
-    """
-    Process a natural-language retail question.
-
-    The Copilot is instantiated per request using
-    the authenticated user's analytics context.
-    """
-
-    question = payload.question.strip()
-
-    if not question:
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Question cannot be empty.",
-        )
-
-    try:
-
-        assistant = StoreSenseCopilot(
-            analytics
-        )
-
-        result = assistant.ask(
-            question
-        )
-
-        if isinstance(result, dict):
-
-            return {
-                "ok": True,
-                **result,
-            }
-
-        return {
-            "ok": True,
-            "answer": str(result),
-        }
-
-    except Exception as exc:
-
-        print(
-            "Copilot error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=(
-                "StoreSense could not process "
-                "the requested analysis."
-            ),
-        ) from exc
-
-
-# ============================================================
-# MOBILE PRODUCT SEARCH
-# ============================================================
-
-@app.get(
-    "/api/mobile/products",
-)
-async def mobile_products(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Mobile-friendly product endpoint.
-    """
-
-    try:
-
-        frame = data.products
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
-            )
-
-        else:
-            records = frame
-
-        return {
-            "ok": True,
-            "products": records,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Mobile products error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve mobile products.",
-        ) from exc
-
-
-# ============================================================
-# MOBILE INVENTORY
-# ============================================================
-
-@app.get(
-    "/api/mobile/inventory",
-)
-async def mobile_inventory(
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Mobile-friendly inventory endpoint.
-    """
-
-    try:
-
-        frame = data.inventory
-
-        if hasattr(frame, "to_dict"):
-
-            records = frame.to_dict(
-                orient="records"
-            )
-
-        else:
-            records = frame
-
-        return {
-            "ok": True,
-            "inventory": records,
-        }
-
-    except Exception as exc:
-
-        print(
-            "Mobile inventory error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to retrieve mobile inventory.",
-        ) from exc
-
-
-# ============================================================
-# MOBILE SALE
-# ============================================================
-
-@app.post(
-    "/api/mobile/sale",
-)
-async def mobile_sale(
-    payload: SaleRequest,
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
-    """
-    Record a sale for the authenticated user's
-    store/product combination.
-    """
-
-    try:
-
-        # Validate ownership before writing.
-        products = data.products
-        stores = data.stores
-
-        product_ids = set(
-            products["product_id"].astype(str)
-            if hasattr(products, "__getitem__")
-            else []
-        )
-
-        store_ids = set(
-            stores["store_id"].astype(str)
-            if hasattr(stores, "__getitem__")
-            else []
-        )
-
-        if str(payload.product_id) not in product_ids:
-
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Product not found.",
-            )
-
-        if str(payload.store_id) not in store_ids:
-
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Store not found.",
-            )
-
-        # Use the database layer's sale method if available.
-        if hasattr(data, "record_sale"):
-
-            result = data.record_sale(
-                store_id=payload.store_id,
-                product_id=payload.product_id,
-                units_sold=payload.units_sold,
-            )
-
-            return {
-                "ok": True,
-                "sale": result,
-            }
-
-        if hasattr(data, "add_sale"):
-
-            result = data.add_sale(
-                store_id=payload.store_id,
-                product_id=payload.product_id,
-                units_sold=payload.units_sold,
-            )
-
-            return {
-                "ok": True,
-                "sale": result,
-            }
-
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=(
-                "The current database layer does not "
-                "expose a sale creation method."
-            ),
-        )
-
-    except HTTPException:
         raise
 
-    except Exception as exc:
-
-        print(
-            "Mobile sale error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to record the sale.",
-        ) from exc
-
 
 # ============================================================
-# INVENTORY UPDATE
+# INITIALIZE AUTH
 # ============================================================
 
-@app.post(
-    "/api/mobile/inventory",
-)
-async def update_mobile_inventory(
-    payload: InventoryUpdateRequest,
-    data: RetailData = Depends(
-        get_user_data
-    ),
-):
+def initialize_auth() -> None:
     """
-    Update stock for a product at a store.
+    Initialize the authentication system.
 
-    The database layer is responsible for maintaining
-    inventory history.
+    Safe to call multiple times.
+
+    IMPORTANT:
+    This function is intentionally NOT called automatically
+    when the module is imported.
     """
 
-    try:
+    init_auth_db()
 
-        if hasattr(data, "update_inventory"):
-
-            result = data.update_inventory(
-                store_id=payload.store_id,
-                product_id=payload.product_id,
-                stock=payload.stock,
-            )
-
-            return {
-                "ok": True,
-                "inventory": result,
-            }
-
-        if hasattr(data, "set_inventory"):
-
-            result = data.set_inventory(
-                store_id=payload.store_id,
-                product_id=payload.product_id,
-                stock=payload.stock,
-            )
-
-            return {
-                "ok": True,
-                "inventory": result,
-            }
-
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=(
-                "The current database layer does not "
-                "expose an inventory update method."
-            ),
-        )
-
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-
-        print(
-            "Inventory update error:",
-            repr(exc),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to update inventory.",
-        ) from exc
-
-
-# ============================================================
-# STATIC FILES
-# ============================================================
-
-if FRONTEND_DIR.exists():
-
-    app.mount(
-        "/static",
-        StaticFiles(
-            directory=str(FRONTEND_DIR)
-        ),
-        name="static",
-    )
-
-
-# ============================================================
-# ERROR HANDLERS
-# ============================================================
-
-@app.exception_handler(
-    StarletteHTTPException
-)
-async def http_exception_handler(
-    request: Request,
-    exc: StarletteHTTPException,
-):
-    """
-    Return consistent JSON for API errors.
-    """
-
-    if request.url.path.startswith("/api/"):
-
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={
-                "ok": False,
-                "detail": exc.detail,
-            },
-            headers=exc.headers,
-        )
-
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "detail": exc.detail,
-        },
-        headers=exc.headers,
-    )
-
-
-@app.exception_handler(
-    Exception
-)
-async def unhandled_exception_handler(
-    request: Request,
-    exc: Exception,
-):
-    """
-    Prevent raw internal errors from being exposed
-    to the browser.
-    """
-
-    print(
-        "Unhandled StoreSense error:",
-        repr(exc),
-    )
-
-    if request.url.path.startswith("/api/"):
-
-        return JSONResponse(
-            status_code=500,
-            content={
-                "ok": False,
-                "detail": (
-                    "StoreSense encountered an "
-                    "unexpected server error."
-                ),
-            },
-        )
-
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Internal server error."
-        },
-    )
-
-
-# ============================================================
-# APPLICATION START
-# ============================================================
-
-if __name__ == "__main__":
-
-    import uvicorn
-
-    uvicorn.run(
-        "app:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=False,
-    )
+    ensure_default_manager()
