@@ -1,34 +1,4 @@
-"""
-StoreSense Authentication
-=========================
-
-Authentication utilities for the StoreSense FastAPI application.
-
-Features:
-- SQLite user storage
-- Secure bcrypt password hashing
-- JWT access tokens
-- Token validation
-- Current-user extraction
-- Automatic default manager creation
-- Serverless-safe lazy database initialization
-
-Environment variables:
-
-    STORESENSE_AUTH_DB
-    STORESENSE_JWT_SECRET
-    STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES
-
-Example:
-
-    STORESENSE_JWT_SECRET=your-long-random-secret
-    STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES=480
-
-Important:
-- The authentication database is separate from retail data.
-- The SQLite database is initialized lazily.
-- No database is created merely by importing this module.
-"""
+# src/auth.py
 
 from __future__ import annotations
 
@@ -36,504 +6,192 @@ import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import bcrypt
-from dotenv import load_dotenv
 from jose import JWTError, jwt
+from dotenv import load_dotenv
 
 
-# ============================================================
-# ENVIRONMENT
-# ============================================================
+# ---------------------------------------------------------
+# Environment
+# ---------------------------------------------------------
 
-load_dotenv()
-
-
-# ============================================================
-# PROJECT PATHS
-# ============================================================
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-DATA_DIR = PROJECT_ROOT / "data"
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
-# ============================================================
-# AUTH DATABASE LOCATION
-# ============================================================
+# ---------------------------------------------------------
+# Configuration helpers
+# ---------------------------------------------------------
 
 def _get_auth_database_path() -> Path:
     """
-    Determine the SQLite authentication database path.
+    Get a writable SQLite path.
 
-    Priority:
-
-    1. STORESENSE_AUTH_DB environment variable
-    2. /tmp on serverless environments
-    3. local data/storesense_auth.db
-
-    Serverless platforms generally do not allow reliable writes
-    to the application directory. /tmp is writable, although
-    its contents are not guaranteed to persist between instances.
+    Vercel/serverless filesystems are read-only except for /tmp,
+    so use /tmp in deployed serverless environments.
     """
 
-    configured_path = os.getenv(
-        "STORESENSE_AUTH_DB",
-        "",
-    ).strip()
+    configured = os.getenv("STORESENSE_AUTH_DB")
 
-    if configured_path:
-        return Path(
-            configured_path
-        ).expanduser()
+    if configured:
+        return Path(configured)
 
-    # Vercel / common serverless environment.
     if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
-        return Path(
-            "/tmp/storesense_auth.db"
-        )
+        return Path("/tmp/storesense_auth.db")
 
-    return DATA_DIR / "storesense_auth.db"
-
-
-AUTH_DB = _get_auth_database_path()
-
-
-# ============================================================
-# JWT CONFIGURATION
-# ============================================================
-
-JWT_ALGORITHM = "HS256"
+    return BASE_DIR / "data" / "storesense_auth.db"
 
 
 def _get_jwt_secret() -> str:
     """
-    Get the JWT secret at runtime.
+    JWT signing secret.
 
-    A development fallback is provided so the application can
-    still run locally without a .env file.
-
-    For deployment, STORESENSE_JWT_SECRET should always be set.
+    Set STORESENSE_JWT_SECRET in Vercel Environment Variables.
     """
 
-    secret = os.getenv(
+    return os.getenv(
         "STORESENSE_JWT_SECRET",
-        "",
-    ).strip()
+        "storesense-development-secret-change-me",
+    )
 
-    if secret:
-        return secret
 
-    return "storesense-development-secret-change-me"
+JWT_ALGORITHM = "HS256"
 
 
 def _get_access_token_expire_minutes() -> int:
-    """
-    Read JWT expiration configuration safely.
-    """
-
-    raw_value = os.getenv(
-        "STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES",
-        "480",
-    ).strip()
-
     try:
-        value = int(raw_value)
+        return int(os.getenv("STORESENSE_ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
     except (TypeError, ValueError):
-        value = 480
-
-    if value <= 0:
-        value = 480
-
-    return value
+        return 1440
 
 
-# ============================================================
-# DATABASE CONNECTION
-# ============================================================
+# ---------------------------------------------------------
+# Database
+# ---------------------------------------------------------
 
 def get_connection() -> sqlite3.Connection:
     """
-    Create a SQLite authentication database connection.
-
-    The directory is created only when a database connection is
-    actually requested.
-
-    This is intentionally NOT executed during module import.
+    Open the authentication SQLite database.
     """
 
-    database_path = AUTH_DB
+    db_path = _get_auth_database_path()
+
+    parent = db_path.parent
 
     try:
-        database_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-    except OSError as exc:
-        raise RuntimeError(
-            "Unable to create the StoreSense authentication "
-            f"database directory: {database_path.parent}"
-        ) from exc
+        parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # In unusual serverless environments, /tmp should still be usable.
+        db_path = Path("/tmp/storesense_auth.db")
+        db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        connection = sqlite3.connect(
-            str(database_path),
-            check_same_thread=False,
-            timeout=30,
-        )
-    except sqlite3.Error as exc:
-        raise RuntimeError(
-            "Unable to open the StoreSense authentication database."
-        ) from exc
-
+    connection = sqlite3.connect(str(db_path))
     connection.row_factory = sqlite3.Row
 
     return connection
 
 
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
-
 def init_auth_db() -> None:
     """
-    Create the authentication database and users table.
-
-    Safe to call repeatedly.
+    Create the authentication table if it does not exist.
+    Safe to call multiple times.
     """
 
-    with get_connection() as connection:
-
-        connection.execute(
+    with get_connection() as conn:
+        conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-
                 email TEXT NOT NULL UNIQUE,
-
-                full_name TEXT NOT NULL,
-
                 password_hash TEXT NOT NULL,
-
+                full_name TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'manager',
-
-                is_active INTEGER NOT NULL DEFAULT 1,
-
-                created_at TEXT NOT NULL,
-
-                updated_at TEXT NOT NULL
+                created_at TEXT NOT NULL
             )
             """
         )
 
-        connection.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_users_email
-            ON users(email)
-            """
-        )
-
-        connection.commit()
+        conn.commit()
 
 
-# ============================================================
-# PASSWORD HASHING
-# ============================================================
+# ---------------------------------------------------------
+# Password helpers
+# ---------------------------------------------------------
 
-def hash_password(
-    password: str,
-) -> str:
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def hash_password(password: str) -> str:
     """
     Hash a password using bcrypt.
 
-    The plaintext password is never stored.
+    bcrypt supports a maximum password input of 72 bytes.
     """
 
-    if not isinstance(password, str):
-        raise TypeError(
-            "Password must be a string."
-        )
-
-    if not password:
-        raise ValueError(
-            "Password cannot be empty."
-        )
-
-    password_bytes = password.encode(
-        "utf-8"
-    )
+    password_bytes = password.encode("utf-8")
 
     if len(password_bytes) > 72:
-        raise ValueError(
-            "Password is too long for bcrypt. "
-            "Please use 72 bytes or fewer."
-        )
+        raise ValueError("Password must be 72 bytes or fewer.")
 
     hashed = bcrypt.hashpw(
         password_bytes,
         bcrypt.gensalt(),
     )
 
-    return hashed.decode(
-        "utf-8"
-    )
+    return hashed.decode("utf-8")
 
 
-def verify_password(
-    plain_password: str,
-    password_hash: str,
-) -> bool:
+def verify_password(password: str, password_hash: str) -> bool:
     """
     Verify a plaintext password against a bcrypt hash.
     """
 
-    if not isinstance(
-        plain_password,
-        str,
-    ):
-        return False
-
-    if not isinstance(
-        password_hash,
-        str,
-    ):
-        return False
-
-    if not plain_password:
-        return False
-
-    if not password_hash:
-        return False
-
     try:
+        password_bytes = password.encode("utf-8")
+
+        if len(password_bytes) > 72:
+            return False
 
         return bcrypt.checkpw(
-            plain_password.encode(
-                "utf-8"
-            ),
-            password_hash.encode(
-                "utf-8"
-            ),
+            password_bytes,
+            password_hash.encode("utf-8"),
         )
 
-    except (
-        ValueError,
-        TypeError,
-        bcrypt.InvalidHashError,
-    ):
+    except (ValueError, TypeError, bcrypt.InvalidHashError):
         return False
 
 
-# ============================================================
-# EMAIL HELPERS
-# ============================================================
+# ---------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------
 
-def normalize_email(
-    email: str,
-) -> str:
-    """
-    Normalize an email address.
-    """
-
-    if not isinstance(
-        email,
-        str,
-    ):
-        return ""
-
-    return email.strip().lower()
-
-
-# ============================================================
-# CREATE USER
-# ============================================================
-
-def create_user(
-    email: str,
-    password: str,
-    full_name: str = "Store Manager",
-    role: str = "manager",
-) -> dict[str, Any]:
-    """
-    Create a new StoreSense user.
-
-    Raises:
-        ValueError:
-            If input is invalid or email already exists.
-    """
-
-    # Ensure DB exists before accessing it.
-    init_auth_db()
-
-    email = normalize_email(
-        email
-    )
-
-    full_name = (
-        full_name.strip()
-        if isinstance(
-            full_name,
-            str,
-        )
-        else ""
-    )
-
-    role = (
-        role.strip()
-        if isinstance(
-            role,
-            str,
-        )
-        else "manager"
-    )
-
-    if not email:
-        raise ValueError(
-            "Email is required."
-        )
-
-    if "@" not in email:
-        raise ValueError(
-            "Please enter a valid email address."
-        )
-
-    if len(email) > 320:
-        raise ValueError(
-            "Email address is too long."
-        )
-
-    if not isinstance(
-        password,
-        str,
-    ):
-        raise ValueError(
-            "Password is required."
-        )
-
-    if len(password) < 6:
-        raise ValueError(
-            "Password must contain at least 6 characters."
-        )
-
-    if len(
-        password.encode("utf-8")
-    ) > 72:
-        raise ValueError(
-            "Password is too long for bcrypt. "
-            "Please use 72 bytes or fewer."
-        )
-
-    if not full_name:
-        raise ValueError(
-            "Full name is required."
-        )
-
-    if len(full_name) > 150:
-        raise ValueError(
-            "Full name is too long."
-        )
-
-    if not role:
-        role = "manager"
-
-    password_hash = hash_password(
-        password
-    )
-
-    now = datetime.now(
-        timezone.utc
-    ).isoformat()
-
-    try:
-
-        with get_connection() as connection:
-
-            cursor = connection.execute(
-                """
-                INSERT INTO users (
-                    email,
-                    full_name,
-                    password_hash,
-                    role,
-                    is_active,
-                    created_at,
-                    updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    email,
-                    full_name,
-                    password_hash,
-                    role,
-                    1,
-                    now,
-                    now,
-                ),
-            )
-
-            connection.commit()
-
-            user_id = cursor.lastrowid
-
-    except sqlite3.IntegrityError as exc:
-
-        if "email" in str(
-            exc
-        ).lower():
-
-            raise ValueError(
-                "A user with this email already exists."
-            ) from exc
-
-        raise ValueError(
-            "Unable to create the user."
-        ) from exc
-
+def _row_to_user(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": user_id,
-        "email": email,
-        "full_name": full_name,
-        "role": role,
-        "is_active": True,
-        "created_at": now,
+        "id": row["id"],
+        "user_id": str(row["id"]),
+        "email": row["email"],
+        "full_name": row["full_name"],
+        "role": row["role"],
+        "created_at": row["created_at"],
     }
 
 
-# ============================================================
-# GET USER BY EMAIL
-# ============================================================
-
-def get_user_by_email(
-    email: str,
-) -> dict[str, Any] | None:
+def get_user_by_email(email: str) -> Optional[dict[str, Any]]:
     """
-    Find a user by email address.
+    Find a user by email.
     """
 
     init_auth_db()
 
-    email = normalize_email(
-        email
-    )
+    email = normalize_email(email)
 
-    if not email:
-        return None
-
-    with get_connection() as connection:
-
-        row = connection.execute(
+    with get_connection() as conn:
+        row = conn.execute(
             """
-            SELECT
-                id,
-                email,
-                full_name,
-                password_hash,
-                role,
-                is_active,
-                created_at,
-                updated_at
+            SELECT id, email, full_name, role, created_at
             FROM users
             WHERE email = ?
             LIMIT 1
@@ -544,163 +202,184 @@ def get_user_by_email(
     if row is None:
         return None
 
-    return dict(row)
+    return _row_to_user(row)
 
 
-# ============================================================
-# GET USER BY ID
-# ============================================================
-
-def get_user_by_id(
-    user_id: int | str,
-) -> dict[str, Any] | None:
+def get_user_by_id(user_id: str | int) -> Optional[dict[str, Any]]:
     """
-    Find a user by numeric database ID.
+    Find a user by ID.
     """
 
     init_auth_db()
 
-    try:
-        user_id = int(
-            user_id
-        )
-    except (
-        TypeError,
-        ValueError,
-    ):
-        return None
-
-    with get_connection() as connection:
-
-        row = connection.execute(
+    with get_connection() as conn:
+        row = conn.execute(
             """
-            SELECT
-                id,
-                email,
-                full_name,
-                password_hash,
-                role,
-                is_active,
-                created_at,
-                updated_at
+            SELECT id, email, full_name, role, created_at
             FROM users
             WHERE id = ?
             LIMIT 1
             """,
-            (user_id,),
+            (str(user_id),),
         ).fetchone()
 
     if row is None:
         return None
 
-    return dict(row)
+    return _row_to_user(row)
 
 
-# ============================================================
-# PUBLIC USER
-# ============================================================
-
-def public_user(
-    user: dict[str, Any],
+def create_user(
+    email: str,
+    password: str,
+    full_name: str,
+    role: str = "manager",
 ) -> dict[str, Any]:
     """
-    Return safe user information.
-
-    Password hashes are never returned.
+    Create a new user.
     """
 
+    init_auth_db()
+
+    email = normalize_email(email)
+    full_name = full_name.strip()
+    role = role.strip() or "manager"
+
+    if not email:
+        raise ValueError("Email is required.")
+
+    if not password:
+        raise ValueError("Password is required.")
+
+    if not full_name:
+        raise ValueError("Full name is required.")
+
+    existing = get_user_by_email(email)
+
+    if existing:
+        raise ValueError("A user with this email already exists.")
+
+    password_hash = hash_password(password)
+
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO users (
+                    email,
+                    password_hash,
+                    full_name,
+                    role,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    email,
+                    password_hash,
+                    full_name,
+                    role,
+                    created_at,
+                ),
+            )
+
+            conn.commit()
+
+            user_id = cursor.lastrowid
+
+    except sqlite3.IntegrityError:
+        raise ValueError("A user with this email already exists.")
+
     return {
-        "id": user["id"],
-        "email": user["email"],
-        "full_name": user["full_name"],
-        "role": user["role"],
-        "is_active": bool(
-            user["is_active"]
-        ),
-        "created_at": user["created_at"],
+        "id": user_id,
+        "user_id": str(user_id),
+        "email": email,
+        "full_name": full_name,
+        "role": role,
+        "created_at": created_at,
     }
 
 
-# ============================================================
-# AUTHENTICATE USER
-# ============================================================
+# ---------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------
 
 def authenticate_user(
     email: str,
     password: str,
-) -> dict[str, Any] | None:
+) -> Optional[dict[str, Any]]:
     """
     Authenticate a user using email and password.
-
-    Returns:
-        User dictionary if successful.
-        None otherwise.
     """
 
-    user = get_user_by_email(
-        email
-    )
+    init_auth_db()
 
-    if user is None:
+    email = normalize_email(email)
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                id,
+                email,
+                password_hash,
+                full_name,
+                role,
+                created_at
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+            """,
+            (email,),
+        ).fetchone()
+
+    if row is None:
         return None
 
-    if not bool(
-        user["is_active"]
-    ):
+    if not verify_password(password, row["password_hash"]):
         return None
 
-    if not verify_password(
-        password,
-        user["password_hash"],
-    ):
-        return None
+    return {
+        "id": row["id"],
+        "user_id": str(row["id"]),
+        "email": row["email"],
+        "full_name": row["full_name"],
+        "role": row["role"],
+        "created_at": row["created_at"],
+    }
 
-    return user
 
-
-# ============================================================
-# CREATE ACCESS TOKEN
-# ============================================================
+# ---------------------------------------------------------
+# JWT
+# ---------------------------------------------------------
 
 def create_access_token(
     user: dict[str, Any],
-    expires_minutes: int | None = None,
+    expires_delta: Optional[timedelta] = None,
 ) -> str:
     """
-    Create a signed JWT access token.
+    Create a JWT access token.
     """
 
-    if expires_minutes is None:
-        expires_minutes = (
-            _get_access_token_expire_minutes()
+    user_id = user.get("user_id") or user.get("id")
+
+    if user_id is None:
+        raise ValueError("User ID is required to create an access token.")
+
+    if expires_delta is None:
+        expires_delta = timedelta(
+            minutes=_get_access_token_expire_minutes()
         )
 
-    if expires_minutes <= 0:
-        expires_minutes = 480
-
-    now = datetime.now(
-        timezone.utc
-    )
-
-    expires_at = (
-        now
-        + timedelta(
-            minutes=expires_minutes
-        )
-    )
+    expire = datetime.now(timezone.utc) + expires_delta
 
     payload = {
-        "sub": str(
-            user["id"]
-        ),
-        "email": user["email"],
-        "role": user["role"],
-        "iat": int(
-            now.timestamp()
-        ),
-        "exp": int(
-            expires_at.timestamp()
-        ),
+        "sub": str(user_id),
+        "email": user.get("email"),
+        "role": user.get("role", "manager"),
+        "exp": expire,
     }
 
     return jwt.encode(
@@ -710,180 +389,119 @@ def create_access_token(
     )
 
 
-# ============================================================
-# DECODE ACCESS TOKEN
-# ============================================================
-
-def decode_access_token(
-    token: str,
-) -> dict[str, Any] | None:
+def decode_access_token(token: str) -> Optional[dict[str, Any]]:
     """
-    Decode and validate a JWT access token.
+    Decode and validate a JWT.
     """
-
-    if not isinstance(
-        token,
-        str,
-    ):
-        return None
-
-    token = token.strip()
-
-    if not token:
-        return None
 
     try:
-
         payload = jwt.decode(
             token,
             _get_jwt_secret(),
-            algorithms=[
-                JWT_ALGORITHM
-            ],
+            algorithms=[JWT_ALGORITHM],
         )
 
-        user_id = payload.get(
-            "sub"
-        )
+        subject = payload.get("sub")
 
-        if not user_id:
+        if subject is None:
             return None
 
         return payload
 
-    except (
-        JWTError,
-        TypeError,
-        ValueError,
-    ):
+    except JWTError:
         return None
 
 
-# ============================================================
-# GET USER FROM TOKEN
-# ============================================================
-
-def get_user_from_token(
-    token: str,
-) -> dict[str, Any] | None:
+def get_user_from_token(token: str) -> Optional[dict[str, Any]]:
     """
-    Resolve a JWT token to an active StoreSense user.
+    Decode JWT and retrieve the corresponding user.
     """
 
-    payload = decode_access_token(
-        token
-    )
+    payload = decode_access_token(token)
 
-    if payload is None:
+    if not payload:
         return None
 
-    try:
+    user_id = payload.get("sub")
 
-        user_id = int(
-            payload["sub"]
-        )
-
-    except (
-        KeyError,
-        TypeError,
-        ValueError,
-    ):
+    if not user_id:
         return None
 
-    user = get_user_by_id(
-        user_id
-    )
+    return get_user_by_id(user_id)
+
+
+# ---------------------------------------------------------
+# Public user representation
+# ---------------------------------------------------------
+
+def public_user(user: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    """
+    Return safe user information for the frontend.
+    """
 
     if user is None:
         return None
 
-    if not bool(
-        user["is_active"]
-    ):
-        return None
+    return {
+        "id": user.get("id"),
+        "user_id": str(user.get("user_id") or user.get("id")),
+        "email": user.get("email"),
+        "full_name": user.get("full_name"),
+        "role": user.get("role", "manager"),
+    }
 
-    return user
 
-
-# ============================================================
-# DEFAULT MANAGER ACCOUNT
-# ============================================================
-
-DEFAULT_MANAGER_EMAIL = (
-    "manager@storesense.local"
-)
-
-DEFAULT_MANAGER_PASSWORD = (
-    "StoreSense@123"
-)
-
-DEFAULT_MANAGER_NAME = (
-    "Store Manager"
-)
-
-DEFAULT_MANAGER_ROLE = (
-    "manager"
-)
-
+# ---------------------------------------------------------
+# Default manager
+# ---------------------------------------------------------
 
 def ensure_default_manager() -> dict[str, Any]:
     """
-    Ensure that the default manager account exists.
-
-    Existing accounts are never overwritten.
+    Create the default StoreSense manager account if it does not exist.
     """
 
     init_auth_db()
 
-    existing = get_user_by_email(
-        DEFAULT_MANAGER_EMAIL
-    )
+    email = "manager@storesense.local"
 
-    if existing is not None:
+    existing = get_user_by_email(email)
+
+    if existing:
         return existing
 
-    try:
-
-        return create_user(
-            email=DEFAULT_MANAGER_EMAIL,
-            password=DEFAULT_MANAGER_PASSWORD,
-            full_name=DEFAULT_MANAGER_NAME,
-            role=DEFAULT_MANAGER_ROLE,
-        )
-
-    except ValueError as exc:
-
-        # Another request may have created the account
-        # simultaneously.
-        if "already exists" in str(
-            exc
-        ).lower():
-
-            existing = get_user_by_email(
-                DEFAULT_MANAGER_EMAIL
-            )
-
-            if existing is not None:
-                return existing
-
-        raise
+    return create_user(
+        email=email,
+        password="StoreSense@123",
+        full_name="Store Manager",
+        role="manager",
+    )
 
 
-# ============================================================
-# INITIALIZE AUTH
-# ============================================================
+# ---------------------------------------------------------
+# Application initialization
+# ---------------------------------------------------------
 
 def initialize_auth() -> None:
     """
-    Initialize the authentication system.
-
-    Safe to call multiple times.
+    Initialize authentication storage.
 
     IMPORTANT:
-    This function is intentionally NOT called automatically
-    when the module is imported.
+    This function is intentionally NOT called automatically when
+    this module is imported.
+
+    This prevents import-time crashes on Vercel/serverless.
     """
 
     init_auth_db()
-
     ensure_default_manager()
+
+
+# ---------------------------------------------------------
+# IMPORTANT:
+#
+# DO NOT put this at the bottom:
+#
+# initialize_auth()
+#
+# Also DO NOT import anything from src.auth inside src.auth.
+# ---------------------------------------------------------
