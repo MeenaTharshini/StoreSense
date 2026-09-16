@@ -4,7 +4,10 @@
 
 <aside class="sidebar" id="storeSidebar">
 
-    <!-- BRAND -->
+    <!-- =====================================================
+         BRAND
+         ===================================================== -->
+
     <div class="sidebar-brand">
 
         <a href="/" class="sidebar-brand-link">
@@ -14,6 +17,7 @@
             </div>
 
             <div class="sidebar-brand-text">
+
                 <div class="sidebar-brand-name">
                     StoreSense
                 </div>
@@ -21,12 +25,14 @@
                 <div class="sidebar-brand-subtitle">
                     Retail Intelligence
                 </div>
+
             </div>
 
         </a>
 
 
         <!-- DESKTOP COLLAPSE TOGGLE -->
+
         <button
             type="button"
             class="sidebar-collapse-button"
@@ -34,25 +40,37 @@
             aria-label="Collapse sidebar"
             aria-expanded="true"
         >
+
             <span class="sidebar-collapse-icon">
                 ‹
             </span>
+
         </button>
 
     </div>
 
 
-    <!-- NAVIGATION -->
-    <nav class="sidebar-navigation" aria-label="Main navigation">
+    <!-- =====================================================
+         NAVIGATION
+         ===================================================== -->
 
+    <nav
+        class="sidebar-navigation"
+        aria-label="Main navigation"
+    >
 
-        <!-- WORKSPACE -->
+        <!-- =================================================
+             WORKSPACE
+             ================================================= -->
+
         <div class="sidebar-section">
 
             <div class="sidebar-section-label">
                 Workspace
             </div>
 
+
+            <!-- DASHBOARD -->
 
             <a
                 href="/"
@@ -61,7 +79,9 @@
             >
 
                 <span class="sidebar-nav-icon">
-                    <span class="icon-dashboard">⌂</span>
+                    <span class="icon-dashboard">
+                        ⌂
+                    </span>
                 </span>
 
                 <span class="sidebar-nav-text">
@@ -71,6 +91,8 @@
             </a>
 
 
+            <!-- DATA CENTER -->
+
             <a
                 href="/data-center"
                 class="sidebar-nav-item"
@@ -78,7 +100,9 @@
             >
 
                 <span class="sidebar-nav-icon">
-                    <span class="icon-data">▦</span>
+                    <span class="icon-data">
+                        ▦
+                    </span>
                 </span>
 
                 <span class="sidebar-nav-text">
@@ -88,6 +112,8 @@
             </a>
 
 
+            <!-- INVENTORY -->
+
             <a
                 href="/inventory"
                 class="sidebar-nav-item"
@@ -95,7 +121,9 @@
             >
 
                 <span class="sidebar-nav-icon">
-                    <span class="icon-inventory">□</span>
+                    <span class="icon-inventory">
+                        □
+                    </span>
                 </span>
 
                 <span class="sidebar-nav-text">
@@ -107,13 +135,18 @@
         </div>
 
 
-        <!-- INTELLIGENCE -->
+        <!-- =================================================
+             INTELLIGENCE
+             ================================================= -->
+
         <div class="sidebar-section">
 
             <div class="sidebar-section-label">
                 Intelligence
             </div>
 
+
+            <!-- AI COPILOT -->
 
             <a
                 href="/#copilot"
@@ -122,7 +155,9 @@
             >
 
                 <span class="sidebar-nav-icon">
-                    <span class="icon-copilot">✦</span>
+                    <span class="icon-copilot">
+                        ✦
+                    </span>
                 </span>
 
                 <span class="sidebar-nav-text">
@@ -136,90 +171,138 @@
     </nav>
 
 
-    <!-- SIDEBAR FOOTER -->
-    <!-- SIDEBAR FOOTER -->
-<div class="sidebar-footer">
+    <!-- =====================================================
+         SIDEBAR FOOTER
+         ===================================================== -->
 
-    <!-- LOGGED-IN USER -->
-    <div class="sidebar-user-card" id="sidebarUserCard">
+    <div class="sidebar-footer">
 
-        <div class="sidebar-user-avatar" id="sidebarUserAvatar">
-            U
-        </div>
 
-        <div class="sidebar-user-info">
+        <!-- =================================================
+             LOGGED-IN USER
+             ================================================= -->
 
-            <div
-                class="sidebar-user-name"
-                id="sidebarUserName"
-            >
-                User
-            </div>
+        <div
+            class="sidebar-user-card"
+            id="sidebarUserCard"
+        >
+
+            <!-- USER AVATAR -->
 
             <div
-                class="sidebar-user-role"
-                id="sidebarUserRole"
+                class="sidebar-user-avatar"
+                id="sidebarUserAvatar"
+                aria-hidden="true"
             >
-                Retail Manager
+                U
             </div>
 
-        </div>
 
-    </div>
+            <!-- USER INFORMATION -->
 
+            <div class="sidebar-user-info">
 
-    <!-- LOGOUT -->
-    <button
-        type="button"
-        class="sidebar-logout-button"
-        id="sidebarLogoutButton"
-    >
+                <!-- NAME -->
 
-        <span class="sidebar-logout-icon">
-            ↪
-        </span>
-
-        <span class="sidebar-nav-text">
-            Logout
-        </span>
-
-    </button>
+                <div
+                    class="sidebar-user-name"
+                    id="sidebarUserName"
+                    title="User"
+                >
+                    User
+                </div>
 
 
-    <!-- SYSTEM STATUS -->
-    <div class="sidebar-status-card">
+                <!-- EMAIL -->
 
-        <span class="sidebar-status-dot"></span>
+                <div
+                    class="sidebar-user-email"
+                    id="sidebarUserEmail"
+                    title="user@example.com"
+                >
+                    user@example.com
+                </div>
 
-        <div class="sidebar-status-content">
-
-            <div class="sidebar-status-title">
-                System status
-            </div>
-
-            <div
-                class="sidebar-status-text"
-                id="sidebarStatus"
-            >
-                Connected
             </div>
 
         </div>
 
+
+        <!-- =================================================
+             LOGOUT
+             ================================================= -->
+
+        <button
+            type="button"
+            class="sidebar-logout-button"
+            id="sidebarLogoutButton"
+            aria-label="Logout"
+        >
+
+            <span
+                class="sidebar-logout-icon"
+                aria-hidden="true"
+            >
+                ↪
+            </span>
+
+            <span class="sidebar-nav-text">
+                Logout
+            </span>
+
+        </button>
+
+
+        <!-- =================================================
+             SYSTEM STATUS
+             ================================================= -->
+
+        <div class="sidebar-status-card">
+
+            <span
+                class="sidebar-status-dot"
+                aria-hidden="true"
+            ></span>
+
+
+            <div class="sidebar-status-content">
+
+                <div class="sidebar-status-title">
+                    System status
+                </div>
+
+                <div
+                    class="sidebar-status-text"
+                    id="sidebarStatus"
+                >
+                    Connected
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             POWERED BY
+             ================================================= -->
+
+        <div class="sidebar-powered">
+            StoreSense Intelligence
+        </div>
+
     </div>
-
-
-    <div class="sidebar-powered">
-        StoreSense Intelligence
-    </div>
-
-</div>
 
 </aside>
 
 
-<!-- MOBILE HEADER -->
+<!-- =========================================================
+     MOBILE HEADER
+     ========================================================= -->
+
 <header class="mobile-sidebar-header">
+
+    <!-- MOBILE MENU BUTTON -->
 
     <button
         type="button"
@@ -236,11 +319,17 @@
     </button>
 
 
-    <a href="/" class="mobile-sidebar-brand">
+    <!-- MOBILE BRAND -->
+
+    <a
+        href="/"
+        class="mobile-sidebar-brand"
+    >
 
         <span class="mobile-sidebar-logo">
             S
         </span>
+
 
         <span class="mobile-sidebar-brand-text">
 
@@ -259,7 +348,10 @@
 </header>
 
 
-<!-- MOBILE OVERLAY -->
+<!-- =========================================================
+     MOBILE OVERLAY
+     ========================================================= -->
+
 <div
     class="sidebar-overlay"
     id="sidebarOverlay"

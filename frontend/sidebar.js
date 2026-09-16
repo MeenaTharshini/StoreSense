@@ -874,113 +874,97 @@
     );
     document.addEventListener("DOMContentLoaded", () => {
 
-    // =========================================================
-    // LOAD LOGGED-IN USER
-    // =========================================================
+    const userName = document.getElementById("sidebarUserName");
+    const userEmail = document.getElementById("sidebarUserEmail");
+    const userAvatar = document.getElementById("sidebarUserAvatar");
+    const logoutButton = document.getElementById("sidebarLogoutButton");
 
-    const userNameElement = document.getElementById("sidebarUserName");
-    const userRoleElement = document.getElementById("sidebarUserRole");
-    const userAvatarElement = document.getElementById("sidebarUserAvatar");
+    // -----------------------------------------
+    // LOAD LOGGED-IN USER
+    // -----------------------------------------
+
+    let user = null;
 
     try {
-
         const storedUser = localStorage.getItem("storesense_user");
 
         if (storedUser) {
-
-            const user = JSON.parse(storedUser);
-
-            const name =
-                user.full_name ||
-                user.name ||
-                user.username ||
-                user.email ||
-                "User";
-
-            const role =
-                user.role ||
-                "Retail Manager";
-
-            userNameElement.textContent = name;
-            userRoleElement.textContent = role;
-
-            // First letter of username
-            userAvatarElement.textContent =
-                name.charAt(0).toUpperCase();
-
+            user = JSON.parse(storedUser);
         }
-
     } catch (error) {
+        console.error("Failed to load user:", error);
+    }
 
-        console.error(
-            "Unable to load sidebar user:",
-            error
-        );
+
+    if (user) {
+
+        // Name
+        const name =
+            user.full_name ||
+            user.name ||
+            user.username ||
+            "User";
+
+        // Email
+        const email =
+            user.email ||
+            "No email";
+
+
+        userName.textContent = name;
+        userEmail.textContent = email;
+
+
+        // Avatar
+        userAvatar.textContent =
+            name.charAt(0).toUpperCase();
 
     }
 
 
-    // =========================================================
+    // -----------------------------------------
     // LOGOUT
-    // =========================================================
-
-    const logoutButton =
-        document.getElementById("sidebarLogoutButton");
+    // -----------------------------------------
 
     if (logoutButton) {
 
-        logoutButton.addEventListener(
-            "click",
-            async () => {
+        logoutButton.addEventListener("click", async () => {
 
-                const token =
-                    localStorage.getItem(
-                        "storesense_access_token"
-                    );
+            try {
 
-                try {
-
-                    // Tell backend to invalidate/logout
-                    if (token) {
-
-                        await fetch(
-                            "/api/auth/logout",
-                            {
-                                method: "POST",
-                                headers: {
-                                    "Authorization":
-                                        `Bearer ${token}`
-                                }
-                            }
-                        );
-
+                // Tell backend to logout
+                await fetch("/api/auth/logout", {
+                    method: "POST",
+                    headers: {
+                        "Authorization":
+                            `Bearer ${localStorage.getItem("storesense_access_token")}`
                     }
+                });
 
-                } catch (error) {
+            } catch (error) {
 
-                    console.warn(
-                        "Logout API request failed:",
-                        error
-                    );
+                console.error(
+                    "Logout request failed:",
+                    error
+                );
 
-                } finally {
+            } finally {
 
-                    // Always clear local session
-                    localStorage.removeItem(
-                        "storesense_access_token"
-                    );
+                // Remove authentication information
+                localStorage.removeItem(
+                    "storesense_access_token"
+                );
 
-                    localStorage.removeItem(
-                        "storesense_user"
-                    );
+                localStorage.removeItem(
+                    "storesense_user"
+                );
 
-                    // Prevent going back into protected pages
-                    window.location.replace("/login");
-
-                }
+                // Redirect to login
+                window.location.href = "/login";
 
             }
-        );
+
+        });
 
     }
 
