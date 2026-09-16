@@ -311,12 +311,27 @@ def authenticate_user(
     password: str,
 ) -> Optional[dict[str, Any]]:
     """
-    Authenticate a user using email and password.
+    Authenticate a StoreSense user.
+
+    The default demo manager is automatically created when needed.
+    This is important for Vercel/serverless instances where the
+    temporary SQLite database may start empty.
     """
 
     init_auth_db()
 
     email = normalize_email(email)
+
+    # ---------------------------------------------------------
+    # Ensure the built-in demo manager exists
+    # ---------------------------------------------------------
+
+    if email == "manager@storesense.local":
+        ensure_default_manager()
+
+    # ---------------------------------------------------------
+    # Find user
+    # ---------------------------------------------------------
 
     with get_connection() as conn:
         row = conn.execute(
@@ -338,8 +353,19 @@ def authenticate_user(
     if row is None:
         return None
 
-    if not verify_password(password, row["password_hash"]):
+    # ---------------------------------------------------------
+    # Verify password
+    # ---------------------------------------------------------
+
+    if not verify_password(
+        password,
+        row["password_hash"],
+    ):
         return None
+
+    # ---------------------------------------------------------
+    # Return authenticated user
+    # ---------------------------------------------------------
 
     return {
         "id": row["id"],
@@ -349,7 +375,6 @@ def authenticate_user(
         "role": row["role"],
         "created_at": row["created_at"],
     }
-
 
 # ---------------------------------------------------------
 # JWT

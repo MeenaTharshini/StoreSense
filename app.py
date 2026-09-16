@@ -53,8 +53,6 @@ DATA_DIR = BASE_DIR / "data"
 # AUTHENTICATION INITIALIZATION
 # ============================================================
 
-initialize_auth()
-
 security = HTTPBearer(
     auto_error=False
 )
@@ -363,14 +361,12 @@ def register(
 ):
     """
     Create a new StoreSense manager account.
-
-    Registration automatically logs the user in.
     """
 
     try:
+        initialize_auth()
 
         name = payload.name.strip()
-
         email = payload.email.strip().lower()
 
         if not name:
@@ -401,12 +397,10 @@ def register(
         }
 
     except ValueError as exc:
-
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         )
-
 
 @app.post("/api/auth/login")
 def login(
@@ -416,30 +410,46 @@ def login(
     Authenticate a StoreSense user.
     """
 
-    email = payload.email.strip().lower()
+    try:
+        # Ensure authentication database exists.
+        initialize_auth()
 
-    user = authenticate_user(
-        email=email,
-        password=payload.password,
-    )
+        email = payload.email.strip().lower()
 
-    if user is None:
-
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password.",
+        user = authenticate_user(
+            email=email,
+            password=payload.password,
         )
 
-    token = create_access_token(user)
+        if user is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password.",
+            )
 
-    return {
-        "ok": True,
-        "message": "Login successful.",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": public_user(user),
-    }
+        token = create_access_token(user)
 
+        return {
+            "ok": True,
+            "message": "Login successful.",
+            "access_token": token,
+            "token_type": "bearer",
+            "user": public_user(user),
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+        print(
+            "Login error:",
+            repr(exc),
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Authentication service error.",
+        )
 
 @app.get("/api/auth/me")
 def current_user(
