@@ -309,73 +309,61 @@ def create_user(
 def authenticate_user(
     email: str,
     password: str,
-) -> Optional[dict[str, Any]]:
-    """
-    Authenticate a StoreSense user.
-
-    The default demo manager is automatically created when needed.
-    This is important for Vercel/serverless instances where the
-    temporary SQLite database may start empty.
-    """
-
+):
     init_auth_db()
 
     email = normalize_email(email)
 
-    # ---------------------------------------------------------
-    # Ensure the built-in demo manager exists
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
+    # VERCEL / SERVERLESS FALLBACK
+    # --------------------------------------------------------
+    # SQLite under /tmp is ephemeral. If a fresh serverless
+    # instance has no default manager, recreate it.
+    # --------------------------------------------------------
 
-    if email == "manager@storesense.local":
+    user = get_user_by_email(email)
+
+    if (
+        user is None
+        and email == DEFAULT_MANAGER_EMAIL
+    ):
         ensure_default_manager()
+        user = get_user_by_email(email)
 
-    # ---------------------------------------------------------
-    # Find user
-    # ---------------------------------------------------------
+    if user is None:
+        return None
 
-    with get_connection() as conn:
+    # --------------------------------------------------------
+    # FETCH PASSWORD HASH
+    # --------------------------------------------------------
+
+    conn = get_connection()
+
+    try:
         row = conn.execute(
             """
-            SELECT
-                id,
-                email,
-                password_hash,
-                full_name,
-                role,
-                created_at
+            SELECT password_hash
             FROM users
             WHERE email = ?
-            LIMIT 1
             """,
             (email,),
         ).fetchone()
 
+    finally:
+        conn.close()
+
     if row is None:
         return None
 
-    # ---------------------------------------------------------
-    # Verify password
-    # ---------------------------------------------------------
+    password_hash = row["password_hash"]
 
     if not verify_password(
         password,
-        row["password_hash"],
+        password_hash,
     ):
         return None
 
-    # ---------------------------------------------------------
-    # Return authenticated user
-    # ---------------------------------------------------------
-
-    return {
-        "id": row["id"],
-        "user_id": str(row["id"]),
-        "email": row["email"],
-        "full_name": row["full_name"],
-        "role": row["role"],
-        "created_at": row["created_at"],
-    }
-
+    return user
 # ---------------------------------------------------------
 # JWT
 # ---------------------------------------------------------
